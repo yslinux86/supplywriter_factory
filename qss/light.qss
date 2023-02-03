@@ -1,0 +1,68 @@
+QDialog {
+    background-color: #F5F5F5;
+}
+
+QPushButton {
+    border: none;
+    border-radius: 4px;
+    color: #ffffff;
+    padding: 6px;
+    background-color:#05988C;
+    min-width: 45px;
+}
+QPushButton:hover, QPushButton:pressed {
+    background-color: #05B8fC;
+}
+QPushButton:disabled {
+    background-color:#556B2F;
+}
+QGroupBox {
+    font: bold 15px;
+    color: #000000;
+    border: 1px solid #F4A460;
+    border-radius: 4px;
+}
+QLabel {
+    font: default;
+    color: #000000;
+}
+QRadioButton {
+    color: #000000;
+}
+QRadioButton:pressed {
+    color: green;
+    border-color: blueviolet;
+}
+QRadioButton::indicator:checked {
+    border: 1px solid #008080;
+    border-radius: 6px;
+    border-style: outset;
+    padding: 1px;
+    background-color: qlineargradient(spread:pad, x1:0.5, y1:1, x2:0.5, y2:0, stop:0 rgba(30,144,255, 255), stop:1 rgba(0,139,139, 255));
+}
+QRadioButton::indicator:unchecked {
+    border: 1px solid #008080;
+    border-radius: 6px;
+    border-style: outset;
+    padding: 1px;
+    background-color: #ffffff;
+}
+QLineEdit {
+    border: 1px solid #6495ED;
+    border-radius: 4px;
+    padding: 1px;
+    background: #F0F8FF;
+    selection-color: white;
+    selection-background-color: black;
+}
+QLineEdit[echoMode="2"] {
+    lineedit-password-character: 9679;
+}
+QLineEdit:read-only {
+    background: #F0F8FF;
+}
+QSpinBox {
+    padding-right: 2px;
+    border: 1px solid #6495ED;
+    border-radius: 4px;
+}

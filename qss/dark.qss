@@ -1,0 +1,122 @@
+QDialog {
+    background-color: #404040;
+    font-family: "Microsoft YaHei";
+}
+
+QPushButton {
+    border: none;
+    border-radius: 4px;
+    color: #ffffff;
+    padding: 6px;
+    background-color: #606060;
+    min-width: 45px;
+}
+QPushButton:hover, QPushButton:pressed {
+    background-color: #000000;
+    color: #ffffff;
+}
+QPushButton:disabled {
+    background-color: #d0d0d0;
+    color: #000000;
+}
+QLabel {
+    font: default;
+    color: #FFFFFF;
+}
+QGroupBox {
+    font: bold 15px;
+    color: #FFFFFF;
+    border: 1px solid #DCDCDC;
+    border-radius: 4px;
+}
+QCheckBox {
+    color: #ffffff;
+}
+QCheckBox::indicator:checked {
+    border-style: outset;
+    border-width: 1px;
+    background-color: qlineargradient(spread:pad, x1:0.5, y1:1, x2:0.5, y2:0, stop:0 rgba(128, 128, 128, 255), stop:1 rgba(80, 80, 80, 255));
+}
+QCheckBox::indicator:unchecked {
+    border-style: outset;
+    border-width: 1px;
+    background-color: #ffffff;
+}
+QRadioButton {
+    color: #ffffff;
+}
+QRadioButton:pressed {
+    color: green;
+    border-color: blueviolet;
+}
+QRadioButton::indicator:checked {
+    border: none;
+    border-radius: 6px;
+    border-style: outset;
+    padding: 1px;
+    background-color: qlineargradient(spread:pad, x1:0.5, y1:1, x2:0.5, y2:0, stop:0 rgba(128, 128, 128, 255), stop:1 rgba(80, 80, 80, 255));
+}
+QRadioButton::indicator:unchecked {
+    border: none;
+    border-radius: 6px;
+    border-style: outset;
+    padding: 1px;
+    background-color: #ffffff;
+}
+QLineEdit {
+    color: white;
+    border: 1px solid gray;
+    border-radius: 4px;
+    padding: 1px;
+    background: #202020;
+    selection-background-color: #ffffff;
+    selection-color: black;
+}
+QLineEdit[echoMode="2"] {
+    lineedit-password-character: 9679;
+}
+QLineEdit:read-only {
+    background: gray;
+}
+QLineEdit:disabled { /* QLineEdit在禁用时的状态 */
+    color: #B4B4B4;
+}
+QSpinBox::up-arrow:disabled, QSpinBox::up-arrow:off {
+    padding-right: 2px;
+    border: 1px solid gray;
+    border-radius: 4px;
+}
+QComboBox {
+    border: 1px solid gray;
+    border-radius: 3px;
+    padding: 1px 18px 1px 3px;
+}
+QComboBox:!editable, QComboBox::drop-down:editable {
+     background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                 stop: 0 #E1E1E1, stop: 0.4 #DDDDDD,
+                                 stop: 0.5 #D8D8D8, stop: 1.0 #D3D3D3);
+}
+/* QComboBox gets the "on" state when the popup is open */
+QComboBox:!editable:on, QComboBox::drop-down:editable:on {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                stop: 0 #D3D3D3, stop: 0.4 #D8D8D8,
+                                stop: 0.5 #DDDDDD, stop: 1.0 #E1E1E1);
+}
+QComboBox:on { /* shift the text when the popup opens */
+    padding-top: 3px;
+    padding-left: 4px;
+}
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 15px;
+    border-left-width: 1px;
+    border-left-color: darkgray;
+    border-left-style: solid; /* just a single line */
+    border-top-right-radius: 3px; /* same radius as the QComboBox */
+    border-bottom-right-radius: 3px;
+}
+QComboBox::down-arrow:on { /* shift the arrow when popup is open */
+    top: 1px;
+    left: 1px;
+}
