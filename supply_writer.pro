@@ -16,6 +16,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
     foremanauth.cpp \
     logindialog.cpp \
+    sqlchipinfo.cpp \
     statemonitor.cpp \
     readback.cpp \
     maindialog.cpp
@@ -23,6 +24,7 @@ SOURCES += \
 HEADERS += \
     foremanauth.h \
     logindialog.h \
+    sqlchipinfo.h \
     statemonitor.h \
     common.h \
     readback.h \
@@ -33,7 +35,8 @@ FORMS += \
     logindialog.ui \
     maindialog.ui \
     5_8booth.ui \
-    readback.ui
+    readback.ui \
+    sqlchipinfo.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

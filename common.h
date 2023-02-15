@@ -5,6 +5,8 @@
 
 // 服务端监听的端口号
 #define TCP_PORT   8899
+//监听的广播端口
+#define BC_UDP_PORT   8890
 
 #define _TONER_CHIP_ADDR    0x2c
 #define _DRUM_CHIP_ADDR     0x28
@@ -18,13 +20,23 @@ enum {
     OP_WRITE_INFO,           //上位机写入耗材信息
     OP_READ_TONER_INFO,      //上位机读取耗材信息
     OP_READ_DRUM_INFO,
-
     OP_GET_STATUS,          //获取治具状态，返回治具上安装的耗材芯片状态
     OP_GET_SUPPLY_INFO,     //获取耗材信息
+
     OP_GET_BOOTH_STATE,     //获取治具各卡座状态
+    OP_GET_STATE_LONGCONN,  //获取状态的长连接
     OP_WRITE_BULK_INFO,     //批量写入耗材信息
     OP_READ_BOOTH_TONER,
     OP_READ_BOOTH_DRUM,
+
+    OP_SEND_BULK_INFO,      //发送批量数据到治具
+    OP_SEND_ONE_INFO,       //发送某个卡座数据到治具，单独写入
+    OP_STOP_GET_BOOTH_STATE,    //上位机停止检测卡座状态，按钮按下时
+    OP_RESUME_GET_BOOTH_STATE,  //上位机重新开始检测卡座状态，按钮松开时
+    RE_HEARTBEAT_SIGNAL,    //发送心跳包，维护长连接句柄有效性
+
+    OP_BROADCAST_UDP_REQUEST = 99,
+    OP_BROADCAST_UDP_RESP,
 };
 
 //下位机的反馈
@@ -59,11 +71,11 @@ struct cgprintech_supply_info
     char serial_no[32];             //序列号
 
     char marketing_area[4];         //销售地区，中国为"CN"，美国为"US"，日本为"JP"
-    uint8_t product_date[4];   //出厂日期，如2022年7月23日，这里应为0x20,0x22,0x07,0x23
+    uint8_t product_date[4];        //出厂日期，如2022年7月23日，这里应为0x20,0x22,0x07,0x23
 
     char manufacturer[16];          //厂商名称，如"cgprintech"
     char trade_mark[16];            //商标，如"cgprintech"
-    char type[4];                   //类型，原装为"O"，授权贩卖为"M"
+    char type[4];                   //类型，原装为"I"，授权贩卖为"M"
 
     uint8_t pages[4];        //总页数
     uint8_t dots[4];         //总点数
@@ -81,6 +93,7 @@ struct cgprintech_supply_info
 struct cgprintech_supply_sqlinfo
 {
     QString operator_id;             //操作员
+    QString foreman;         //领班
     char model_id[16];              //型号
     char serial_no[32];             //序列号
 
@@ -109,7 +122,7 @@ struct cgprintech_supply_info_readback
 
     char manufacturer[16];          //厂商名称，如"cgprintech"
     char trade_mark[16];            //商标，如"cgprintech"
-    char type[4];                   //类型，原装为"O"，授权贩卖为"M"
+    char type[4];                   //类型，原装为"I"，授权贩卖为"M"
 
     uint8_t pages[4];        //总页数
     uint8_t dots[4];         //总点数
@@ -131,16 +144,28 @@ struct cgprintech_supply_info_readback
 } __attribute__((__packed__));
 #define SUPPLY_INFO_READBACK_LEN    sizeof(struct cgprintech_supply_info_readback)
 
-//上送治具上各卡座状态信息
+//上送治具上各卡座状态信息及写芯片结果信息
 typedef struct booth_state {
     RespInfo resp;
     uint8_t mode;     //根据上位机对卡座组的选择决定
+    //写芯片结果定义
+#define _CHIP_WRITE_SUCCESS  0    //写入成功
+#define _CHIP_WRITE_FAILED   1    //写入失败
+#define _CHIP_HAS_DATA       2    //芯片已有数据，未写
+#define _CHIP_MISSING        3    //未发现芯片
     uint8_t state[8];   //根据mode决定可用数据
+    //卡座状态定义
 #define _NO_CHIP       0        //未放置芯片
 #define _BLANK_CHIP    1        //放置了空白芯片
 #define _USED_CHIP     2        //放置了已有数据芯片
 #define _OFF_LINE      3        //设备离线
 } __attribute__((__packed__)) BoothState;
+
+//写单个卡座信息
+typedef struct write_booth_chip {
+    uint8_t index;           //卡座编号
+    struct cgprintech_supply_info info;
+} __attribute__((__packed__)) WriteBoothInfo;
 
 
 //读取卡座上耗材信息
@@ -150,5 +175,26 @@ typedef struct read_booth_chip {
     struct cgprintech_supply_info_readback info;
 } __attribute__((__packed__)) ReadBoothInfo;
 
+
+//该批次数据，批量发送到治具
+typedef struct booth_supply_info_w {
+    int booth_num;        //本次使用的1拖4，该值为4，本次使用1拖8，该值为8
+    char serial_no[8][32];          //8组序列号
+    char model_id[16];              //型号
+    char marketing_area[4];         //销售地区
+    uint8_t product_date[4];        //出厂日期
+    char manufacturer[16];          //厂商名称
+    char trade_mark[16];            //商标
+    char type[4];                   //类型
+    uint8_t pages[4];               //总页数
+    uint8_t beyond_pages[2];        //溢出打印的页数
+    uint8_t free_pages[2];          //前N页打印不计数消耗页数
+} __attribute__((__packed__)) BoothSupplyInfoW;
+
+//治具回复的广播报文
+typedef struct bc_info_resp {
+    RespInfo resp;
+    char ipaddr[40];
+} __attribute__((__packed__)) BcInfoResp;
 
 #endif

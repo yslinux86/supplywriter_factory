@@ -47,13 +47,13 @@ QRadioButton::indicator:unchecked {
     padding: 1px;
     background-color: #ffffff;
 }
-QLineEdit {
+QLineEdit, QListView {
     border: 1px solid #6495ED;
     border-radius: 4px;
     padding: 1px;
     background: #F0F8FF;
     selection-color: white;
-    selection-background-color: black;
+    selection-background-color: #05B8fC;
 }
 QLineEdit[echoMode="2"] {
     lineedit-password-character: 9679;

@@ -14,7 +14,7 @@ ReadBack::ReadBack(QWidget *parent) :
                    Qt::WindowCloseButtonHint);
 
     ui->CloseButton->setDefault(true);
-    get_theme_id(0);
+    ui->SerialNo->setReadOnly(true);
 }
 
 void ReadBack::set_style_sheet(QString filename)
@@ -28,7 +28,7 @@ void ReadBack::set_style_sheet(QString filename)
 
 void ReadBack::get_theme_id(int state)
 {
-    if (state == 1)
+    if (state == 2)
     {
         this->set_style_sheet("dark.qss");
     }

@@ -22,6 +22,12 @@
     <height>480</height>
    </size>
   </property>
+  <property name="font">
+   <font>
+    <family>微软雅黑</family>
+    <pointsize>10</pointsize>
+   </font>
+  </property>
   <property name="windowTitle">
    <string>领班授权</string>
   </property>
@@ -85,6 +91,12 @@
      </item>
      <item>
       <widget class="QLineEdit" name="ForemanName">
+       <property name="font">
+        <font>
+         <family>微软雅黑</family>
+         <pointsize>10</pointsize>
+        </font>
+       </property>
        <property name="maxLength">
         <number>16</number>
        </property>
@@ -95,6 +107,12 @@
      </item>
      <item>
       <widget class="QLineEdit" name="ForemanPasswd">
+       <property name="font">
+        <font>
+         <family>微软雅黑</family>
+         <pointsize>10</pointsize>
+        </font>
+       </property>
        <property name="maxLength">
         <number>16</number>
        </property>
@@ -105,6 +123,12 @@
      </item>
      <item>
       <widget class="QComboBox" name="ComponentNo">
+       <property name="font">
+        <font>
+         <family>微软雅黑</family>
+         <pointsize>10</pointsize>
+        </font>
+       </property>
        <property name="toolTip">
         <string>选择组件料号</string>
        </property>
@@ -125,6 +149,12 @@
      </item>
      <item>
       <widget class="QLineEdit" name="FirstNumber">
+       <property name="font">
+        <font>
+         <family>微软雅黑</family>
+         <pointsize>10</pointsize>
+        </font>
+       </property>
        <property name="maxLength">
         <number>8</number>
        </property>

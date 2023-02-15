@@ -63,7 +63,7 @@ QRadioButton::indicator:unchecked {
     padding: 1px;
     background-color: #ffffff;
 }
-QLineEdit {
+QLineEdit, QListView {
     color: white;
     border: 1px solid gray;
     border-radius: 4px;

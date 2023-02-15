@@ -5,15 +5,16 @@
 #include <QMouseEvent>
 #include <QHostAddress>
 #include <QTcpSocket>
+#include <QUdpSocket>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QMouseEvent>
-#include <QPalette>
 #include <QSettings>
 #include <QPaintEvent>
 #include <QImage>
 #include <QThread>
 #include <QUiLoader>
+#include <QListWidgetItem>
 #include <QSystemTrayIcon>
 #include <QMediaPlayer>
 #include <QButtonGroup>
@@ -103,33 +104,48 @@ public:
     bool checkIpValid(int version, QString ip);
     int checkIPversion(QString IP);
     void Sleep(int msec);
+
+    int StringToHex(char *str, unsigned char *out, unsigned int *outlen);
+    void Pack32(unsigned char* dst, unsigned int val);
+    void Pack16(unsigned char* dst, unsigned int val);
+    unsigned int Unpack32(unsigned char* src);
+    unsigned int Unpack16(unsigned char* src);
+    void hex_dump(const unsigned char *src, size_t length);
+
     quint8 odbc_status = _INVALID_PARA;    //odbc数据库连接
     quint8 server_status = _INVALID_PARA;  //治具连接
 
 private:
     Ui::MainDialog *ui;
     StateMonitor* worker = NULL;
-    QTimer* timer[2] = {NULL};
+    QTimer* timer[4] = {NULL};
     bool is_drag = false;
     QPoint mouse_start_point;
     QPoint window_start_point;
-
+    bool is_done = false;
+    bool check_booth_flag = true;
     bool chipmode = false;   // false，4组，true，8组
     int year, month, day;
+    int theme_state = 0;
     quint16 serial_id;
     quint16 current_number;
     quint16 max_num;           //本次任务最大序号
     QString serial_no[8];
-    QTcpSocket *tcpSocket[2] = {NULL};
+#define CHECK_STATE_SOCKET  0
+#define SEND_DATA_SOCKET    1
+#define LONGCONN_SOCKET     2
+    QTcpSocket* tcpSocket[3] = {NULL};
+    QUdpSocket* udpSocket = NULL;
     QButtonGroup* group[3];
     QSqlDatabase db;
+#define DATABASE_NAME   "cgprintech"
+#define TABLE_NAME      "supplyinfo"
     QSqlQuery query;
     QMediaPlayer *player = NULL;
     bool working_mode = _AUTO_WRITE_MODE;  //默认采用自动写入模式
     QString ComponentNo;
     QUiLoader uiload;
     QWidget* m_Widget;
-    QCheckBox* checkbox[4];
     QPushButton* readbutton[4];
     QPushButton* writebutton[4];
     QLineEdit* lineedit[4];
@@ -139,20 +155,27 @@ signals:
     void send_db_config(QString _db_ip, QString _db_user, QString _db_pwd, QString _db_ds);
     void sendChipInfo(struct cgprintech_supply_info_readback* info);
     void sendChipBoothNo(quint8 index);
+    void sendSqlInfo(struct cgprintech_supply_sqlinfo* info);
+    void sendThemeMode(int state);
 
 private:
     void init_dialog();
+    bool open_longconn_socket();
     bool check_server_status();
     void play_mp3_sound(QString file);
     void try_connect_db();
     void open_sql_server();
+    void insert_info_mysql(char* serialno);
+    void clear_serialno_info();
     void Update_FixtureStatus();
     void set_style_sheet(QString filename);
     void load_widgets();
     bool sendData(int cmd, void* data, int data_len);
     QString calculate_checkcode(QString str);
     void update_timestamp();
-    void update_serialno();
+    void update_serialno(quint8 num);
+    void send_onecmd_read(uint8_t index);
+    void send_oneinfo_write(uint8_t index, char* serialno);
 
 protected:
     void mouseMoveEvent(QMouseEvent *event);
@@ -160,23 +183,19 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event);
 
 private slots:
+    void send_heartbeat_signal();
     void get_work_content(QString operator_name, QString foreman,
                           QString component_id, quint32 planned_number, quint32 first_number);
-    void on_CheckChip1_stateChanged(int arg1);
-    void on_CheckChip2_stateChanged(int arg1);
-    void on_CheckChip3_stateChanged(int arg1);
-    void on_CheckChip4_stateChanged(int arg1);
-    void CheckChip5_stateChanged(int arg1);
-    void CheckChip6_stateChanged(int arg1);
-    void CheckChip7_stateChanged(int arg1);
-    void CheckChip8_stateChanged(int arg1);
     void on_ChooseAuto_clicked();
     void on_ChooseManual_clicked();
     void on_FixtureIPAddr_textChanged(const QString &arg1);
-
+    void scan_the_fixtures();
+    void udp_data_recv();
     void slotConnected();
     void dataReceived();
     void statusReceived();
+    void result_Received();
+
     void slotGetDBStatus(quint8 _odbc_status);
     void update_connect_fixture();
     void update_ui_info();
@@ -209,6 +228,8 @@ private slots:
     void WriteChip8_clicked();
     void on_QueryInfo_clicked();
     void on_DeleteInfo_clicked();
+    void on_TheSerialNo_textChanged(const QString &arg1);
+    void on_RecommendFixtures_itemDoubleClicked(QListWidgetItem *item);
 };
 
 #endif // MAINDIALOG_H

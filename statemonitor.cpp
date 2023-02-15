@@ -59,7 +59,7 @@ void StateMonitor::open_sql_server()
     }
     else
     {
-        qDebug() << "error open database because" << db_thread.lastError().text();
+//        qDebug() << "error open database because" << db_thread.lastError().text();
         odbc_status = _FAILED_STATUS;
     }
 }
