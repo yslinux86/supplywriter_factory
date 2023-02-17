@@ -1,1 +1,0 @@
-# supplywriter_factory

@@ -31,13 +31,17 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class MainDialog; }
 QT_END_NAMESPACE
 
-#define QSL QStringLiteral
+// 服务端监听的端口号
+#define TCP_PORT       8899
+//监听的广播端口
+#define BC_UDP_PORT    8890
+#define HB_UDP_PORT    8891
 
-#define _SUCCESS_STATUS       false
-#define _FAILED_STATUS        true
+#define _SUCCESS_STATUS       0
+#define _FAILED_STATUS        1
 
-#define _AUTO_WRITE_MODE      false
-#define _MANUAL_READ_MODE     true
+#define _AUTO_WRITE_MODE      0
+#define _MANUAL_READ_MODE     1
 
 static QString _trademark[] =
 {
@@ -111,32 +115,31 @@ public:
     unsigned int Unpack32(unsigned char* src);
     unsigned int Unpack16(unsigned char* src);
     void hex_dump(const unsigned char *src, size_t length);
-
     quint8 odbc_status = _INVALID_PARA;    //odbc数据库连接
-    quint8 server_status = _INVALID_PARA;  //治具连接
+    quint8 server_status[3] = {_INVALID_PARA};  //治具连接
+    bool udp_hb_status = false;
 
 private:
     Ui::MainDialog *ui;
     StateMonitor* worker = NULL;
-    QTimer* timer[4] = {NULL};
+    QTimer* timer[5] = {NULL};
     bool is_drag = false;
     QPoint mouse_start_point;
     QPoint window_start_point;
     bool is_done = false;
-    bool check_booth_flag = true;
+//    bool need_send_info = true;
     bool chipmode = false;   // false，4组，true，8组
     int year, month, day;
     int theme_state = 0;
     quint16 serial_id;
     quint16 current_number;
     quint16 max_num;           //本次任务最大序号
-    QString serial_no[8];
+    QString serial_no[4];
 #define CHECK_STATE_SOCKET  0
 #define SEND_DATA_SOCKET    1
 #define LONGCONN_SOCKET     2
     QTcpSocket* tcpSocket[3] = {NULL};
-    QUdpSocket* udpSocket = NULL;
-    QButtonGroup* group[3];
+    QUdpSocket* udpSocket[2] = {NULL};
     QSqlDatabase db;
 #define DATABASE_NAME   "cgprintech"
 #define TABLE_NAME      "supplyinfo"
@@ -144,17 +147,9 @@ private:
     QMediaPlayer *player = NULL;
     bool working_mode = _AUTO_WRITE_MODE;  //默认采用自动写入模式
     QString ComponentNo;
-    QUiLoader uiload;
-    QWidget* m_Widget;
-    QPushButton* readbutton[4];
-    QPushButton* writebutton[4];
-    QLineEdit* lineedit[4];
-    QLabel* label[4];
 
 signals:
     void send_db_config(QString _db_ip, QString _db_user, QString _db_pwd, QString _db_ds);
-    void sendChipInfo(struct cgprintech_supply_info_readback* info);
-    void sendChipBoothNo(quint8 index);
     void sendSqlInfo(struct cgprintech_supply_sqlinfo* info);
     void sendThemeMode(int state);
 
@@ -168,14 +163,12 @@ private:
     void insert_info_mysql(char* serialno);
     void clear_serialno_info();
     void Update_FixtureStatus();
+    void send_udp_hb_pack(QString ipaddr);
     void set_style_sheet(QString filename);
-    void load_widgets();
     bool sendData(int cmd, void* data, int data_len);
     QString calculate_checkcode(QString str);
     void update_timestamp();
     void update_serialno(quint8 num);
-    void send_onecmd_read(uint8_t index);
-    void send_oneinfo_write(uint8_t index, char* serialno);
 
 protected:
     void mouseMoveEvent(QMouseEvent *event);
@@ -186,46 +179,26 @@ private slots:
     void send_heartbeat_signal();
     void get_work_content(QString operator_name, QString foreman,
                           QString component_id, quint32 planned_number, quint32 first_number);
-    void on_ChooseAuto_clicked();
-    void on_ChooseManual_clicked();
-    void on_FixtureIPAddr_textChanged(const QString &arg1);
-    void scan_the_fixtures();
-    void udp_data_recv();
-    void slotConnected();
-    void dataReceived();
-    void statusReceived();
-    void result_Received();
 
+    void scan_the_fixtures();
+    void check_fixture_online();
+    void udp_data_recv();
+    void udp_hb_recv();
+    void slotConnected0();
+    void slotConnected1();
+    void slotConnected2();
+    void result_Received();
+    void bulkdataReceived();
     void slotGetDBStatus(quint8 _odbc_status);
     void update_connect_fixture();
     void update_ui_info();
+
     void on_DBIPAddr_textChanged(const QString &arg1);
     void on_DBSource_textChanged(const QString &arg1);
     void on_DBUser_textChanged(const QString &arg1);
     void on_DBPasswd_textChanged(const QString &arg1);
+    void on_FixtureIPAddr_textChanged(const QString &arg1);
 
-    void on_ChooseLight_clicked();
-    void on_ChooseDeep_clicked();
-    void on_FourChips_clicked();
-    void on_EightChips_clicked();
-
-    void on_ReadChip1_clicked();
-    void on_ReadChip2_clicked();
-    void on_ReadChip3_clicked();
-    void on_ReadChip4_clicked();
-    void ReadChip5_clicked();
-    void ReadChip6_clicked();
-    void ReadChip7_clicked();
-    void ReadChip8_clicked();
-
-    void on_WriteChip1_clicked();
-    void on_WriteChip2_clicked();
-    void on_WriteChip3_clicked();
-    void on_WriteChip4_clicked();
-    void WriteChip5_clicked();
-    void WriteChip6_clicked();
-    void WriteChip7_clicked();
-    void WriteChip8_clicked();
     void on_QueryInfo_clicked();
     void on_DeleteInfo_clicked();
     void on_TheSerialNo_textChanged(const QString &arg1);

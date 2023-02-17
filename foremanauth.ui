@@ -6,15 +6,9 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>360</width>
-    <height>360</height>
+    <width>430</width>
+    <height>450</height>
    </rect>
-  </property>
-  <property name="minimumSize">
-   <size>
-    <width>360</width>
-    <height>360</height>
-   </size>
   </property>
   <property name="maximumSize">
    <size>
@@ -42,6 +36,9 @@
      </property>
      <property name="leftMargin">
       <number>50</number>
+     </property>
+     <property name="topMargin">
+      <number>20</number>
      </property>
      <property name="rightMargin">
       <number>50</number>
@@ -220,7 +217,7 @@
      <item>
       <widget class="QLabel" name="label_2">
        <property name="text">
-        <string>Cgprintech 辰光融信 版权所有 2023 V2.2</string>
+        <string>Cgprintech 辰光融信 版权所有 2023 V3.0</string>
        </property>
        <property name="alignment">
         <set>Qt::AlignCenter</set>

@@ -18,7 +18,6 @@ SOURCES += \
     logindialog.cpp \
     sqlchipinfo.cpp \
     statemonitor.cpp \
-    readback.cpp \
     maindialog.cpp
 
 HEADERS += \
@@ -27,15 +26,12 @@ HEADERS += \
     sqlchipinfo.h \
     statemonitor.h \
     common.h \
-    readback.h \
     maindialog.h
 
 FORMS += \
     foremanauth.ui \
     logindialog.ui \
     maindialog.ui \
-    5_8booth.ui \
-    readback.ui \
     sqlchipinfo.ui
 
 # Default rules for deployment.

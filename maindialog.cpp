@@ -10,9 +10,10 @@
 #include "logindialog.h"
 #include "maindialog.h"
 #include "foremanauth.h"
-#include "readback.h"
 #include "sqlchipinfo.h"
 #include "ui_maindialog.h"
+
+#define QSL QStringLiteral
 
 MainDialog::MainDialog(QWidget *parent)
     : QDialog(parent)
@@ -22,8 +23,6 @@ MainDialog::MainDialog(QWidget *parent)
     setWindowFlags(Qt::WindowMinimizeButtonHint |
                    Qt::WindowMaximizeButtonHint |
                    Qt::WindowCloseButtonHint);
-
-    load_widgets();
     init_dialog();
 
     db = QSqlDatabase::addDatabase("QODBC", "main");
@@ -40,22 +39,23 @@ MainDialog::MainDialog(QWidget *parent)
     if (!worker->isRunning())
         worker->start(QThread::NormalPriority);
 
-    scan_the_fixtures();
-
     timer[0] = new QTimer(this);
     timer[1] = new QTimer(this);
     timer[2] = new QTimer(this);
     timer[3] = new QTimer(this);
+    timer[4] = new QTimer(this);
 
     connect(timer[0], SIGNAL(timeout()), this, SLOT(update_connect_fixture()));
     connect(timer[1], SIGNAL(timeout()), this, SLOT(update_ui_info()));
     connect(timer[2], SIGNAL(timeout()), this, SLOT(send_heartbeat_signal()));
     connect(timer[3], SIGNAL(timeout()), this, SLOT(scan_the_fixtures()));
+    connect(timer[4], SIGNAL(timeout()), this, SLOT(check_fixture_online()));
 
+    timer[4]->start(5000);
+    timer[3]->start(6000);
+    timer[2]->start(15000);
     timer[0]->start(3000);
-    timer[1]->start(300000);
-    timer[2]->start(10000);
-    timer[3]->start(10000);
+    timer[1]->start(600000);
 }
 
 void MainDialog::udp_data_recv()
@@ -63,31 +63,56 @@ void MainDialog::udp_data_recv()
     BcInfoResp resp;
     qint64 length;
 
-    while(udpSocket->hasPendingDatagrams())
+    while(udpSocket[0]->hasPendingDatagrams())
     {
         QByteArray datagram;
-        length = udpSocket->pendingDatagramSize();
+        length = udpSocket[0]->pendingDatagramSize();
 
-        datagram.resize(udpSocket->pendingDatagramSize());
-        udpSocket->readDatagram(datagram.data(), datagram.size());
+        datagram.resize(udpSocket[0]->pendingDatagramSize());
+        udpSocket[0]->readDatagram(datagram.data(), datagram.size());
         memcpy(&resp, datagram.data(), length);
 
         if (resp.resp.cmd == OP_BROADCAST_UDP_RESP)
         {
+            bool flag = false;
             QString ipaddr = QString("%1").arg(resp.ipaddr);
-            ui->RecommendFixtures->addItem(ipaddr);
+
+            if (ui->RecommendFixtures->count() == 0)
+            {
+                ui->RecommendFixtures->addItem(ipaddr);
+            }
+            else
+            {
+                for (quint8 jj = 0; jj < ui->RecommendFixtures->count(); jj++)
+                {
+                    if (ui->RecommendFixtures->item(jj)->text().compare(ipaddr, Qt::CaseSensitive) == 0)
+                    {
+                        flag = true;
+                        break;
+                    }
+                }
+
+                if (flag == false)
+                    ui->RecommendFixtures->addItem(ipaddr);
+            }
         }
     }
 }
 
 void MainDialog::scan_the_fixtures()
 {
-    //发送嗅探治具的广播报文，治具收到后回复自身IP地址
-    if (udpSocket == NULL)
+    if (is_done)
     {
-        udpSocket = new QUdpSocket(this);
-        connect(udpSocket, SIGNAL(readyRead()), this, SLOT(udp_data_recv()));
-        bool ret = udpSocket->bind(BC_UDP_PORT);
+        timer[3]->stop();
+        return;
+    }
+
+    //发送嗅探治具的广播报文，治具收到后回复自身IP地址
+    if (udpSocket[0] == NULL)
+    {
+        udpSocket[0] = new QUdpSocket(this);
+        connect(udpSocket[0], SIGNAL(readyRead()), this, SLOT(udp_data_recv()));
+        bool ret = udpSocket[0]->bind(BC_UDP_PORT);
         if (!ret)
             return;
     }
@@ -97,14 +122,84 @@ void MainDialog::scan_the_fixtures()
     hdr.len = 0;
     hdr.i2c_addr = 0;
 
-    udpSocket->writeDatagram((char*)&hdr, sizeof(MsgHdr), QHostAddress::Broadcast, BC_UDP_PORT);
-    ui->RecommendFixtures->clear();
+    udpSocket[0]->writeDatagram((char*)&hdr, sizeof(MsgHdr), QHostAddress::Broadcast, BC_UDP_PORT);
+}
+
+void MainDialog::udp_hb_recv()
+{
+    RespInfo resp;
+    qint64 length;
+
+    while(udpSocket[1]->hasPendingDatagrams())
+    {
+        QByteArray datagram;
+        length = udpSocket[1]->pendingDatagramSize();
+
+        datagram.resize(udpSocket[1]->pendingDatagramSize());
+        udpSocket[1]->readDatagram(datagram.data(), datagram.size());
+        memcpy(&resp, datagram.data(), length);
+
+        if (resp.cmd == OP_HB_UDP_REQUEST)
+            udp_hb_status = true;
+    }
+}
+
+void MainDialog::send_udp_hb_pack(QString ipaddr)
+{
+    if (udpSocket[1] == NULL)
+    {
+        udpSocket[1] = new QUdpSocket(this);
+        connect(udpSocket[1], SIGNAL(readyRead()), this, SLOT(udp_hb_recv()));
+        bool ret = udpSocket[1]->bind(HB_UDP_PORT);
+        if (!ret)
+            return;
+    }
+
+    MsgHdr hdr;
+    hdr.cmd = OP_HB_UDP_REQUEST;
+    hdr.len = 0;
+    hdr.i2c_addr = 0;
+
+    udpSocket[1]->writeDatagram((char*)&hdr, sizeof(MsgHdr), QHostAddress(ipaddr), HB_UDP_PORT);
+}
+
+void MainDialog::check_fixture_online()
+{
+//    qDebug() << __func__ << ui->RecommendFixtures->count();
+    if (ui->RecommendFixtures->count() == 0)
+        return;
+
+    int jj = ui->RecommendFixtures->count() - 1;
+    do {
+        udp_hb_status = false;
+        send_udp_hb_pack(ui->RecommendFixtures->item(jj)->text());
+        Sleep(500);
+        if (udp_hb_status)
+        {
+//            qDebug() << jj << ui->RecommendFixtures->item(jj)->text() << "is online";
+        }
+        else
+        {
+//            qDebug() << jj << ui->RecommendFixtures->item(jj)->text() << "is offline";
+            ui->RecommendFixtures->takeItem(jj);
+        }
+
+        if (jj == 0)
+            break;
+
+        jj--;
+    } while(1);
 }
 
 void MainDialog::send_heartbeat_signal()
 {
-    if (!is_done)
-        open_longconn_socket();
+    if (is_done)
+    {
+        timer[2]->stop();
+        return;
+    }
+
+    open_longconn_socket();
 }
 
 void MainDialog::update_timestamp()
@@ -124,9 +219,6 @@ void MainDialog::clear_serialno_info()
     ui->Chip2SerialNo->clear();
     ui->Chip3SerialNo->clear();
     ui->Chip4SerialNo->clear();
-    if (ui->EightChips->isChecked())
-        for (quint8 jj = 0; jj < 4; jj++)
-            lineedit[jj]->clear();
 }
 
 //显示 num 个序列号
@@ -157,122 +249,36 @@ void MainDialog::update_serialno(quint8 num)
     ui->Chip4SerialNo->setText(serial_no[3]);
     if (num == 4)
         return;
-
-    if (ui->EightChips->isChecked())
-    {
-        serial_no[4] = QString("%1%2%3%4%5%6%7").arg(serial_prefix).arg(ComponentNo).arg(serial_trade)
-                .arg(serial_year[year-2021]).arg(serial_month[month-1]).arg(serial_day[day-1]).arg(serial_id++, 4, 10, QLatin1Char('0'));
-        serial_no[5] = QString("%1%2%3%4%5%6%7").arg(serial_prefix).arg(ComponentNo).arg(serial_trade)
-                .arg(serial_year[year-2021]).arg(serial_month[month-1]).arg(serial_day[day-1]).arg(serial_id++, 4, 10, QLatin1Char('0'));
-        serial_no[6] = QString("%1%2%3%4%5%6%7").arg(serial_prefix).arg(ComponentNo).arg(serial_trade)
-                .arg(serial_year[year-2021]).arg(serial_month[month-1]).arg(serial_day[day-1]).arg(serial_id++, 4, 10, QLatin1Char('0'));
-        serial_no[7] = QString("%1%2%3%4%5%6%7").arg(serial_prefix).arg(ComponentNo).arg(serial_trade)
-                .arg(serial_year[year-2021]).arg(serial_month[month-1]).arg(serial_day[day-1]).arg(serial_id++, 4, 10, QLatin1Char('0'));
-
-        lineedit[0]->setText(serial_no[4]);
-        if (num == 5)
-            return;
-        lineedit[1]->setText(serial_no[5]);
-        if (num == 6)
-            return;
-        lineedit[2]->setText(serial_no[6]);
-        if (num == 7)
-            return;
-        lineedit[3]->setText(serial_no[7]);
-        if (num == 8)
-            return;
-    }
 }
 
 void MainDialog::update_ui_info()
 {
     //软件打开隔日情况下，自动更新日期
     this->update_timestamp();
+
     if (!is_done)
     {
         int remain = ui->QuantityRemain->text().toInt();
-        if (ui->EightChips->isChecked())
-        {
-            if (remain > 8)
-                this->update_serialno(8);
-            else
-                this->update_serialno(remain);
-        }
+        if (remain > 4)
+            update_serialno(4);
         else
-        {
-            if (remain > 4)
-                update_serialno(4);
-            else
-                update_serialno(remain);
-        }
+            update_serialno(remain);
     }
-}
-
-void MainDialog::load_widgets()
-{
-    QFile file(QSL(":/5_8booth.ui"));
-    if (!file.open(QIODevice::ReadOnly))
-        return;
-    m_Widget = uiload.load(&file, this);
-    file.close();
-
-    ui->verticalLayout_15->insertWidget(2, m_Widget);
-    m_Widget->hide();
-
-    readbutton[0] = m_Widget->findChild<QPushButton*>(QSL("ReadChip5"));
-    readbutton[1] = m_Widget->findChild<QPushButton*>(QSL("ReadChip6"));
-    readbutton[2] = m_Widget->findChild<QPushButton*>(QSL("ReadChip7"));
-    readbutton[3] = m_Widget->findChild<QPushButton*>(QSL("ReadChip8"));
-
-    connect(readbutton[0], SIGNAL(clicked()), this, SLOT(ReadChip5_clicked()));
-    connect(readbutton[1], SIGNAL(clicked()), this, SLOT(ReadChip6_clicked()));
-    connect(readbutton[2], SIGNAL(clicked()), this, SLOT(ReadChip7_clicked()));
-    connect(readbutton[3], SIGNAL(clicked()), this, SLOT(ReadChip8_clicked()));
-
-    writebutton[0] = m_Widget->findChild<QPushButton*>(QSL("WriteChip5"));
-    writebutton[1] = m_Widget->findChild<QPushButton*>(QSL("WriteChip6"));
-    writebutton[2] = m_Widget->findChild<QPushButton*>(QSL("WriteChip7"));
-    writebutton[3] = m_Widget->findChild<QPushButton*>(QSL("WriteChip8"));
-
-    connect(writebutton[0], SIGNAL(clicked()), this, SLOT(WriteChip5_clicked()));
-    connect(writebutton[1], SIGNAL(clicked()), this, SLOT(WriteChip6_clicked()));
-    connect(writebutton[2], SIGNAL(clicked()), this, SLOT(WriteChip7_clicked()));
-    connect(writebutton[3], SIGNAL(clicked()), this, SLOT(WriteChip8_clicked()));
-
-    lineedit[0] = m_Widget->findChild<QLineEdit*>(QSL("Chip5SerialNo"));
-    lineedit[1] = m_Widget->findChild<QLineEdit*>(QSL("Chip6SerialNo"));
-    lineedit[2] = m_Widget->findChild<QLineEdit*>(QSL("Chip7SerialNo"));
-    lineedit[3] = m_Widget->findChild<QLineEdit*>(QSL("Chip8SerialNo"));
-
-    for (quint8 kk = 0; kk < 4; kk++)
-        lineedit[kk]->setReadOnly(true);
-
-    label[0] = m_Widget->findChild<QLabel*>(QSL("booth5state"));
-    label[1] = m_Widget->findChild<QLabel*>(QSL("booth6state"));
-    label[2] = m_Widget->findChild<QLabel*>(QSL("booth7state"));
-    label[3] = m_Widget->findChild<QLabel*>(QSL("booth8state"));
 }
 
 void MainDialog::update_connect_fixture()
 {
     if (checkIpValid(checkIPversion(ui->FixtureIPAddr->text()), ui->FixtureIPAddr->text()))
     {
-        server_status = check_server_status();
-        if (server_status == _SUCCESS_STATUS && !is_done)
+        server_status[0] = check_server_status();
+        if (server_status[0] == _SUCCESS_STATUS && !is_done)
         {
+//            qDebug() << "send bulk data to fixture";
             unsigned int len;
             BoothSupplyInfoW info;
             memset(&info, 0, sizeof(BoothSupplyInfoW));
-            if (ui->FourChips->isChecked())
-                info.booth_num = 4;
-            else
-            {
-                info.booth_num = 8;
-                for (int kk = 4; kk < 8; kk++)
-                {
-                    memcpy(&info.serial_no[kk], lineedit[kk-4]->text().toLatin1().data(), lineedit[kk-4]->text().length());
-                }
-            }
+
+            info.booth_num = 4;
             memcpy(&info.serial_no[0], ui->Chip1SerialNo->text().toLatin1().data(), ui->Chip1SerialNo->text().length());
             memcpy(&info.serial_no[1], ui->Chip2SerialNo->text().toLatin1().data(), ui->Chip2SerialNo->text().length());
             memcpy(&info.serial_no[2], ui->Chip3SerialNo->text().toLatin1().data(), ui->Chip3SerialNo->text().length());
@@ -295,11 +301,12 @@ void MainDialog::update_connect_fixture()
 
             //测试发现治具连接正常，发送批量芯片数据到治具
             sendData(OP_SEND_BULK_INFO, &info, sizeof(BoothSupplyInfoW));
+//            need_send_info = false;
         }
     }
     else
     {
-        server_status = _INVALID_PARA;
+        server_status[0] = _INVALID_PARA;
     }
 
     Update_FixtureStatus();
@@ -307,19 +314,15 @@ void MainDialog::update_connect_fixture()
 
 void MainDialog::Update_FixtureStatus()
 {
-    if (server_status == _FAILED_STATUS)
+    if (server_status[0] == _FAILED_STATUS)
     {
 //        qDebug() << __func__ << "offline";
-        ui->fixture_state_label->setText("<p style=\"color:red;font-weight:bold\">设备离线！</p>");
-        ui->booth1state->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
-        ui->booth2state->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
-        ui->booth3state->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
-        ui->booth4state->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
-        if (ui->EightChips->isChecked())
-        {
-            for (quint8 kk = 0; kk < 4; kk++)
-                label[kk]->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
-        }
+        ui->fixture_state_label->setText("<p style=\"color:red;font-weight:bold\">治具离线</p>");
+    }
+    else if (server_status[0] == _SUCCESS_STATUS)
+    {
+//        qDebug() << "server is ONLINE";
+        ui->fixture_state_label->setText(tr("<font style='color:#00CD00; font:bold;'>%1</font>").arg(QStringLiteral("治具在线")));
     }
 }
 
@@ -329,8 +332,6 @@ void MainDialog::init_dialog()
     login.set_style_sheet(this, "light.qss");
 
     this->update_timestamp();
-
-    on_ChooseAuto_clicked();
 
     for (qint16 kk = 0; kk < 2; kk++)
     {
@@ -359,33 +360,6 @@ void MainDialog::init_dialog()
 
     ui->DBIPAddr->setFocus();
 
-    group[0] = new QButtonGroup;
-    group[0]->addButton(ui->ChooseAuto);
-    group[0]->addButton(ui->ChooseManual);
-
-    group[1] = new QButtonGroup;
-    group[1]->addButton(ui->ChooseLight);
-    group[1]->addButton(ui->ChooseDeep);
-
-    group[2] = new QButtonGroup;
-    group[2]->addButton(ui->FourChips);
-    group[2]->addButton(ui->EightChips);
-
-    for (quint8 kk = 0; kk < 4; kk++)
-    {
-        writebutton[kk]->setEnabled(false);
-        readbutton[kk]->setEnabled(false);
-    }
-
-    ui->WriteChip1->setEnabled(false);
-    ui->WriteChip2->setEnabled(false);
-    ui->WriteChip3->setEnabled(false);
-    ui->WriteChip4->setEnabled(false);
-    ui->ReadChip1->setEnabled(false);
-    ui->ReadChip2->setEnabled(false);
-    ui->ReadChip3->setEnabled(false);
-    ui->ReadChip4->setEnabled(false);
-
     ui->QueryInfo->setEnabled(false);
     ui->DeleteInfo->setEnabled(false);
 }
@@ -398,26 +372,25 @@ MainDialog::~MainDialog()
         worker->wait(0);
     }
 
-    if (tcpSocket[0])
-         delete tcpSocket[0];
-    if (tcpSocket[1])
-        delete tcpSocket[1];
-    if (tcpSocket[2])
-        delete tcpSocket[2];
-    if (udpSocket)
-        delete udpSocket;
+    int kk;
+    for (kk = 0; kk < 3; kk++)
+    {
+        if (tcpSocket[kk])
+             delete tcpSocket[kk];
+    }
 
-    delete timer[0];
-    delete timer[1];
-    delete timer[2];
-    delete timer[3];
+    for (kk = 0; kk < 2; kk++)
+        if (udpSocket[kk])
+            delete udpSocket[kk];
+
+    for (kk = 0; kk < 5; kk++)
+    {
+        if (timer[kk]->isActive())
+            timer[kk]->stop();
+        delete timer[kk];
+    }
 
     delete player;
-
-    delete group[0];
-    delete group[1];
-    delete group[2];
-
     delete ui;
 }
 
@@ -477,7 +450,10 @@ void MainDialog::get_work_content(QString operator_name, QString foreman,
     this->current_number = first_number;
     this->max_num = first_number + planned_number;
 
-    this->update_serialno(8);
+    if (planned_number > 4)
+        update_serialno(4);
+    else
+        update_serialno(planned_number);
     ui->QuantityRemain->setNum((int)planned_number);
 
     for (qulonglong kk = 0; kk < sizeof(info) / sizeof(struct supplyinfo); kk++)
@@ -491,50 +467,6 @@ void MainDialog::get_work_content(QString operator_name, QString foreman,
             ui->FreePages->setText(QString::number(info[kk].freepages));
             ui->BeyondPages->setText(QString::number(info[kk].beyondpages));
             break;
-        }
-    }
-}
-
-void MainDialog::on_ChooseAuto_clicked()
-{
-    ui->ReadChip1->hide();
-    ui->ReadChip2->hide();
-    ui->ReadChip3->hide();
-    ui->ReadChip4->hide();
-
-    ui->WriteChip1->hide();
-    ui->WriteChip2->hide();
-    ui->WriteChip3->hide();
-    ui->WriteChip4->hide();
-
-    if (ui->EightChips->isChecked())
-    {
-        for (quint8 i = 0; i<4; i++)
-        {
-            readbutton[i]->hide();
-            writebutton[i]->hide();
-        }
-    }
-}
-
-void MainDialog::on_ChooseManual_clicked()
-{
-    ui->ReadChip1->show();
-    ui->ReadChip2->show();
-    ui->ReadChip3->show();
-    ui->ReadChip4->show();
-
-    ui->WriteChip1->show();
-    ui->WriteChip2->show();
-    ui->WriteChip3->show();
-    ui->WriteChip4->show();
-
-    if (ui->EightChips->isChecked())
-    {
-        for (quint8 i = 0; i<4; i++)
-        {
-            readbutton[i]->show();
-            writebutton[i]->show();
         }
     }
 }
@@ -630,165 +562,19 @@ void MainDialog::slotGetDBStatus(quint8 _odbc_status)
     }
 }
 
-void MainDialog::slotConnected()
+void MainDialog::slotConnected0()
 {
-    this->server_status = _SUCCESS_STATUS;
+    server_status[0] = _SUCCESS_STATUS;
 }
 
-void MainDialog::statusReceived()
+void MainDialog::slotConnected1()
 {
-    BoothState state;
-    qint64 length;
+    server_status[1] = _SUCCESS_STATUS;
+}
 
-    while (tcpSocket[0]->bytesAvailable() > 0)
-    {
-        QByteArray datagram;
-        length = tcpSocket[0]->bytesAvailable();
-
-        datagram.resize(tcpSocket[0]->bytesAvailable());
-        tcpSocket[0]->read(datagram.data(), datagram.size());
-        memcpy(&state, datagram.data(), length);
-        tcpSocket[0]->close();
-
-//        qDebug() << __func__ << "resp cmd: " << state.resp.cmd;
-        if (state.resp.cmd == OP_GET_BOOTH_STATE)
-        {
-            if (state.state[0] == _NO_CHIP)
-            {
-                ui->booth1state->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("未放置耗材")));
-                ui->WriteChip1->setEnabled(false);
-                ui->ReadChip1->setEnabled(false);
-            }
-            else if (state.state[0] == _BLANK_CHIP)
-            {
-                ui->booth1state->setText(tr("<font style='color:#556B2F; font:bold;'>%1</font>").arg(QStringLiteral("耗材就绪")));
-                ui->WriteChip1->setEnabled(true);
-                ui->ReadChip1->setEnabled(true);
-            }
-            else if (state.state[0] == _USED_CHIP)
-            {
-                ui->booth1state->setText(tr("<font style='color:#1E90FF; font:bold;'>%1</font>").arg(QStringLiteral("耗材已有数据")));
-                ui->WriteChip1->setEnabled(true);
-                ui->ReadChip1->setEnabled(true);
-            }
-            else if (state.state[0] == _OFF_LINE)
-            {
-                ui->booth1state->setText(tr("<font style='color:#1E90FF; font:bold;'>%1</font>").arg(QStringLiteral("设备离线")));
-                ui->WriteChip1->setEnabled(false);
-                ui->ReadChip1->setEnabled(false);
-            }
-
-            if (state.state[1] == _NO_CHIP)
-            {
-                ui->booth2state->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("未放置耗材")));
-                ui->WriteChip2->setEnabled(false);
-                ui->ReadChip2->setEnabled(false);
-            }
-            else if (state.state[1] == _BLANK_CHIP)
-            {
-                ui->booth2state->setText(tr("<font style='color:#556B2F; font:bold;'>%1</font>").arg(QStringLiteral("耗材就绪")));
-                ui->WriteChip2->setEnabled(true);
-                ui->ReadChip2->setEnabled(false);
-            }
-            else if (state.state[1] == _USED_CHIP)
-            {
-                ui->booth2state->setText(tr("<font style='color:#1E90FF; font:bold;'>%1</font>").arg(QStringLiteral("耗材已有数据")));
-                ui->WriteChip2->setEnabled(true);
-                ui->ReadChip2->setEnabled(true);
-            }
-            else if (state.state[1] == _OFF_LINE)
-            {
-                ui->booth2state->setText(tr("<font style='color:#1E90FF; font:bold;'>%1</font>").arg(QStringLiteral("设备离线")));
-                ui->WriteChip2->setEnabled(false);
-                ui->ReadChip2->setEnabled(false);
-            }
-
-            if (state.state[2] == _NO_CHIP)
-            {
-                ui->booth3state->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("未放置耗材")));
-                ui->WriteChip3->setEnabled(false);
-                ui->ReadChip3->setEnabled(false);
-            }
-            else if (state.state[2] == _BLANK_CHIP)
-            {
-                ui->booth3state->setText(tr("<font style='color:#556B2F; font:bold;'>%1</font>").arg(QStringLiteral("耗材就绪")));
-                ui->WriteChip3->setEnabled(true);
-                ui->ReadChip3->setEnabled(false);
-            }
-            else if (state.state[2] == _USED_CHIP)
-            {
-                ui->booth3state->setText(tr("<font style='color:#1E90FF; font:bold;'>%1</font>").arg(QStringLiteral("耗材已有数据")));
-                ui->WriteChip3->setEnabled(true);
-                ui->ReadChip3->setEnabled(true);
-            }
-            else if (state.state[2] == _OFF_LINE)
-            {
-                ui->booth3state->setText(tr("<font style='color:#1E90FF; font:bold;'>%1</font>").arg(QStringLiteral("设备离线")));
-                ui->WriteChip3->setEnabled(false);
-                ui->ReadChip3->setEnabled(false);
-            }
-
-            if (state.state[3] == _NO_CHIP)
-            {
-                ui->booth4state->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("未放置耗材")));
-                ui->WriteChip4->setEnabled(false);
-                ui->ReadChip4->setEnabled(false);
-            }
-            else if (state.state[3] == _BLANK_CHIP)
-            {
-                ui->booth4state->setText(tr("<font style='color:#556B2F; font:bold;'>%1</font>").arg(QStringLiteral("耗材就绪")));
-                ui->WriteChip4->setEnabled(true);
-                ui->ReadChip4->setEnabled(false);
-            }
-            else if (state.state[3] == _USED_CHIP)
-            {
-                ui->booth4state->setText(tr("<font style='color:#1E90FF; font:bold;'>%1</font>").arg(QStringLiteral("耗材已有数据")));
-                ui->WriteChip4->setEnabled(true);
-                ui->ReadChip4->setEnabled(true);
-            }
-            else if (state.state[3] == _OFF_LINE)
-            {
-                ui->booth4state->setText(tr("<font style='color:#1E90FF; font:bold;'>%1</font>").arg(QStringLiteral("设备离线")));
-                ui->WriteChip4->setEnabled(false);
-                ui->ReadChip4->setEnabled(false);
-            }
-
-            if (ui->EightChips->isChecked() && state.mode == 8)
-            {
-                for (quint8 kk = 4; kk < 8; kk++)
-                {
-//                    qDebug() << __func__ << kk << state.state[kk];
-                    if (state.state[kk] == _NO_CHIP)
-                    {
-                        label[kk-4]->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("未放置耗材")));
-                        writebutton[kk-4]->setEnabled(false);
-                        readbutton[kk-4]->setEnabled(false);
-                    }
-                    else if (state.state[kk] == _BLANK_CHIP)
-                    {
-                        label[kk-4]->setText(tr("<font style='color:#556B2F; font:bold;'>%1</font>").arg(QStringLiteral("耗材就绪")));
-                        writebutton[kk-4]->setEnabled(true);
-                        readbutton[kk-4]->setEnabled(false);
-                    }
-                    else if (state.state[kk] == _USED_CHIP)
-                    {
-                        label[kk-4]->setText(tr("<font style='color:#1E90FF; font:bold;'>%1</font>").arg(QStringLiteral("耗材已有数据")));
-                        writebutton[kk-4]->setEnabled(true);
-                        readbutton[kk-4]->setEnabled(true);
-                    }
-                    else if (state.state[kk] == _OFF_LINE)
-                    {
-                        label[kk-4]->setText(tr("<font style='color:#1E90FF; font:bold;'>%1</font>").arg(QStringLiteral("设备离线")));
-                        writebutton[kk-4]->setEnabled(false);
-                        readbutton[kk-4]->setEnabled(false);
-                    }
-                }
-            }
-        }
-
-        ui->fixture_state_label->setText(tr("<font style='color:green; font:bold;'>%1</font>").arg(QStringLiteral("治具连接正常！")));
-        break;
-    }
+void MainDialog::slotConnected2()
+{
+    server_status[2] = _SUCCESS_STATUS;
 }
 
 void MainDialog::result_Received()
@@ -805,15 +591,23 @@ void MainDialog::result_Received()
         tcpSocket[2]->read(datagram.data(), datagram.size());
         memcpy(&state, datagram.data(), length);
 
-//        qDebug() << __func__ << state.resp.cmd;
-        if (state.resp.cmd == OP_STOP_GET_BOOTH_STATE)
-            check_booth_flag = false;
-        else if (state.resp.cmd == OP_RESUME_GET_BOOTH_STATE)
-            check_booth_flag = true;
-        else if (state.resp.cmd == RE_HEARTBEAT_SIGNAL)
+        if (state.resp.cmd == RE_HEARTBEAT_SIGNAL)
         {
             //收到治具发来的回应，正常，记下时间戳
 //            qDebug() << "recv response from fixture";
+        }
+        else if (state.resp.cmd == OP_TRIGGER_OUT)
+        {
+//            qDebug() << "trigger out from fixture";
+            ui->booth1state->clear();
+            ui->booth2state->clear();
+            ui->booth3state->clear();
+            ui->booth4state->clear();
+            ui->serialno1->clear();
+            ui->serialno2->clear();
+            ui->serialno3->clear();
+            ui->serialno4->clear();
+//            need_send_info = true;
         }
         else if (state.resp.cmd == OP_WRITE_BULK_INFO)
         {
@@ -821,7 +615,8 @@ void MainDialog::result_Received()
             //收到治具批量写数据结果信息
             if (state.state[0] == _CHIP_WRITE_SUCCESS)
             {
-                ui->booth1state->setText(tr("<font style='color:#00994C; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
+                ui->booth1state->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
+                ui->serialno1->setText(tr("<font style='color:#003153;'>%1</font>").arg(state.serial_no[0]));
                 //将耗材信息存入数据库
                 insert_info_mysql(ui->Chip1SerialNo->text().toLocal8Bit().data());
             }
@@ -834,7 +629,8 @@ void MainDialog::result_Received()
 
             if (state.state[1] == _CHIP_WRITE_SUCCESS)
             {
-                ui->booth2state->setText(tr("<font style='color:#00994C; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
+                ui->booth2state->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
+                ui->serialno2->setText(tr("<font style='color:#003153;'>%1</font>").arg(state.serial_no[1]));
                 insert_info_mysql(ui->Chip2SerialNo->text().toLocal8Bit().data());
             }
             else if (state.state[1] == _CHIP_WRITE_FAILED)
@@ -846,7 +642,8 @@ void MainDialog::result_Received()
 
             if (state.state[2] == _CHIP_WRITE_SUCCESS)
             {
-                ui->booth3state->setText(tr("<font style='color:#00994C; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
+                ui->booth3state->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
+                ui->serialno3->setText(tr("<font style='color:#003153;'>%1</font>").arg(state.serial_no[2]));
                 insert_info_mysql(ui->Chip3SerialNo->text().toLocal8Bit().data());
             }
             else if (state.state[2] == _CHIP_WRITE_FAILED)
@@ -858,7 +655,8 @@ void MainDialog::result_Received()
 
             if (state.state[3] == _CHIP_WRITE_SUCCESS)
             {
-                ui->booth4state->setText(tr("<font style='color:#00994C; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
+                ui->booth4state->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
+                ui->serialno4->setText(tr("<font style='color:#003153;'>%1</font>").arg(state.serial_no[3]));
                 insert_info_mysql(ui->Chip4SerialNo->text().toLocal8Bit().data());
             }
             else if (state.state[3] == _CHIP_WRITE_FAILED)
@@ -868,28 +666,10 @@ void MainDialog::result_Received()
             else if (state.state[3] == _CHIP_MISSING)
                 ui->booth4state->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("未发现芯片")));
 
-            if (ui->EightChips->isChecked() && state.mode == 8)
-            {
-                for (quint8 kk = 4; kk < 8; kk++)
-                {
-                    if (state.state[kk] == _CHIP_WRITE_SUCCESS)
-                    {
-                        label[kk-4]->setText(tr("<font style='color:#00994C; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
-                        insert_info_mysql(label[kk-4]->text().toLocal8Bit().data());
-                    }
-                    else if (state.state[kk] == _CHIP_WRITE_FAILED)
-                        label[kk-4]->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("写入失败")));
-                    else if (state.state[kk] == _CHIP_HAS_DATA)
-                        label[kk-4]->setText(tr("<font style='color:#00341C; font:bold;'>%1</font>").arg(QStringLiteral("芯片已有数据")));
-                    else if (state.state[kk] == _CHIP_MISSING)
-                        label[kk-4]->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("未发现芯片")));
-                }
-            }
-
             int remain_num = ui->QuantityRemain->text().toInt();
+            current_number = serial_id;
 //            qDebug() << __func__ << remain_num;
-            if ((remain_num <= 8 && ui->EightChips->isChecked()) ||
-                (remain_num <= 4 && ui->FourChips->isChecked()))
+            if (remain_num <= 4)
             {
                 //任务全部完成
                 is_done = true;
@@ -904,32 +684,14 @@ void MainDialog::result_Received()
             }
             else
             {
-                current_number = serial_id;
+                ui->QuantityRemain->setNum(remain_num - 4);
                 ui->CurrentNumber->setNum(current_number);
-
-                if (state.mode == 8)
-                {
-                    if (remain_num - 8 > 0)
-                    {
-                        ui->QuantityRemain->setNum(remain_num - 8);
-                        if (remain_num - 8 < 8)
-                            update_serialno(remain_num - 8);
-                        else
-                            update_serialno(8);
-                    }
-                }
-                else
-                {
-                    if (remain_num - 4 > 0)
-                    {
-                        ui->QuantityRemain->setNum(remain_num - 4);
-                        if (remain_num - 4 < 4)
-                            update_serialno(remain_num - 4);
-                        else
-                            update_serialno(4);
-                    }
-                }
             }
+
+            if (remain_num > 4)
+                update_serialno(4);
+            else
+                update_serialno(remain_num);
         }
     }
 }
@@ -941,72 +703,43 @@ bool MainDialog::open_longconn_socket()
     if (tcpSocket[2] == NULL)
         tcpSocket[2] = new QTcpSocket(this);
 
-    connect(tcpSocket[2], SIGNAL(connected()), this, SLOT(slotConnected()));
+    connect(tcpSocket[2], SIGNAL(connected()), this, SLOT(slotConnected2()));
     connect(tcpSocket[2], SIGNAL(readyRead()), this, SLOT(result_Received()));
 
     if (tcpSocket[2]->isOpen())
         tcpSocket[2]->close();
 
+    server_status[2] = _FAILED_STATUS;
     tcpSocket[2]->connectToHost(ui->FixtureIPAddr->text(), TCP_PORT);
-    if (!tcpSocket[2]->isOpen())
-        return true;
-//    qDebug("%s, state: %d\n", __func__, tcpSocket[2]->state());
+    Sleep(100);
+    if (server_status[2] == _FAILED_STATUS)
+        return _FAILED_STATUS;
 
     hdr.cmd = OP_GET_STATE_LONGCONN;
     hdr.len = 0;
 
     if (tcpSocket[2]->write((const char*)&hdr, sizeof(hdr)) == -1)
-        return true;
+        return _FAILED_STATUS;
 
-    return false;
+    return _SUCCESS_STATUS;
 }
 
 //定时发送检测治具状态信息
 //返回false表示离线，返回true表示在线
 bool MainDialog::check_server_status()
 {
-//    qDebug() << "check_booth_flag: " << check_booth_flag;
-    if (check_booth_flag == false)
-        return server_status;
+    if (tcpSocket[0] != NULL)
+        delete tcpSocket[0];
+    tcpSocket[0] = new QTcpSocket(this);
 
-    if (tcpSocket[0] == NULL)
-        tcpSocket[0] = new QTcpSocket(this);
+    connect(tcpSocket[0], SIGNAL(connected()), this, SLOT(slotConnected0()));
 
-    this->server_status = _FAILED_STATUS;
-    MsgHdr hdr;
-
-    connect(tcpSocket[0], SIGNAL(connected()), this, SLOT(slotConnected()));
-    connect(tcpSocket[0], SIGNAL(readyRead()), this, SLOT(statusReceived()));
-
-    if (tcpSocket[0]->isOpen())
-        tcpSocket[0]->close();
-
+    server_status[0] = _FAILED_STATUS;
     tcpSocket[0]->connectToHost(ui->FixtureIPAddr->text(), TCP_PORT);
-    if (!tcpSocket[0]->isOpen())
-    {
-//        qDebug() << "tcpsocket 0 is NOT open";
-        return _FAILED_STATUS;
-    }
+    Sleep(100);
 
-    hdr.cmd = OP_GET_BOOTH_STATE;   //获取治具上各卡座状态
-    if (ui->FourChips->isChecked())
-        hdr.len = 4;    //借用len字段定义为芯片数
-    else if (ui->EightChips->isChecked())
-        hdr.len = 8;
 
-    if (ui->ChipModelID->text().mid(0, 3).compare("TL-", Qt::CaseSensitive) == 0)
-        hdr.i2c_addr = _TONER_CHIP_ADDR;
-    else if (ui->ChipModelID->text().mid(0, 3).compare("DL-", Qt::CaseSensitive) == 0)
-        hdr.i2c_addr = _DRUM_CHIP_ADDR;
-
-    if (tcpSocket[0]->write((const char*)&hdr, sizeof(hdr)) == -1)
-    {
-//        qDebug() << "write cmd failed";
-        return _FAILED_STATUS;
-    }
-
-    this->Sleep(100);
-    return server_status;
+    return server_status[0];
 }
 
 void MainDialog::on_FixtureIPAddr_textChanged(const QString &arg1)
@@ -1038,43 +771,15 @@ void MainDialog::on_FixtureIPAddr_textChanged(const QString &arg1)
             delete tcpSocket[2];
             tcpSocket[2] = NULL;
         }
-
-        if (check_server_status() == _FAILED_STATUS)
-        {
-//            qDebug() << "server state offline";
-            ui->fixture_state_label->setText("<p style=\"color:red;font-weight:bold\">设备离线！</p>");
-            ui->booth1state->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
-            ui->booth2state->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
-            ui->booth3state->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
-            ui->booth4state->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
-            if (ui->EightChips->isChecked())
-            {
-                for (quint8 kk = 0; kk < 4; kk++)
-                {
-                    label[kk]->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
-                }
-            }
-        }
-        else
-        {
-//            qDebug() << "server is ONLINE";
-        }
     }
     else if (ui->FixtureIPAddr->text().length())
     {
 //        qDebug() << "invalid ip addr";
-        ui->fixture_state_label->setText("<p style=\"color:red;font-weight:bold\">IP地址不正确！</p>");
+        ui->fixture_state_label->setText("<p style=\"color:red;font-weight:bold\">IP 地址不正确！</p>");
         ui->booth1state->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
         ui->booth2state->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
         ui->booth3state->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
         ui->booth4state->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
-        if (ui->EightChips->isChecked())
-        {
-            for (quint8 kk = 0; kk < 4; kk++)
-            {
-                label[kk]->setText(tr("<font style='color:FF0000; font:bold;'>%1</font>").arg(QStringLiteral("---------")));
-            }
-        }
     }
     else
     {
@@ -1085,79 +790,6 @@ void MainDialog::on_FixtureIPAddr_textChanged(const QString &arg1)
         ui->booth2state->clear();
         ui->booth3state->clear();
         ui->booth4state->clear();
-
-        if (ui->EightChips->isChecked())
-            for (quint8 kk = 0; kk < 4; kk++)
-                label[kk]->clear();
-    }
-}
-
-void MainDialog::dataReceived()
-{
-    unsigned char resp[1024];
-    qint64 length;
-
-    while (tcpSocket[1]->bytesAvailable() > 0)
-    {
-        QByteArray datagram;
-        length = tcpSocket[1]->bytesAvailable();
-
-        datagram.resize(tcpSocket[1]->bytesAvailable());
-        tcpSocket[1]->read(datagram.data(), datagram.size());
-        memcpy(&resp, datagram.data(), length);
-        tcpSocket[1]->close();
-
-        if (((RespInfo*)resp)->ret == RESP_OK)
-        {
-            play_mp3_sound(QCoreApplication::applicationDirPath() + "/sound/done.mp3");
-            if (((RespInfo*)resp)->cmd == OP_READ_BOOTH_TONER ||
-                ((RespInfo*)resp)->cmd == OP_READ_BOOTH_DRUM)
-            {
-                ReadBoothInfo info;
-                memcpy(&info, resp, sizeof(ReadBoothInfo));
-
-                if (((RespInfo*)resp)->cmd == OP_READ_BOOTH_TONER)
-                    ui->fixture_state_label->setText("<p style=\"color:green;font-weight:bold\">粉盒 读取成功！</p>");
-                else if (((RespInfo*)resp)->cmd == OP_READ_BOOTH_DRUM)
-                    ui->fixture_state_label->setText("<p style=\"color:green;font-weight:bold\">鼓组件 读取成功！</p>");
-
-                ReadBack *readback = new ReadBack();
-
-                connect(this, SIGNAL(sendThemeMode(int)), readback, SLOT(get_theme_id(int)));
-                connect(this, SIGNAL(sendChipInfo(struct cgprintech_supply_info_readback*)),
-                        readback, SLOT(show_ChipInfo(struct cgprintech_supply_info_readback*)));
-                connect(this, SIGNAL(sendChipBoothNo(quint8)), readback, SLOT(show_booth_index(quint8)));
-
-                emit sendThemeMode(theme_state);
-                emit sendChipInfo(&info.info);
-                emit sendChipBoothNo(info.index);
-
-                readback->show();
-            }
-            this->Sleep(3000);
-        }
-        else
-        {
-            // operation failed
-            if (((RespInfo*)resp)->cmd == OP_READ_BOOTH_TONER ||
-                ((RespInfo*)resp)->cmd == OP_READ_BOOTH_DRUM)
-            {
-                if (((RespInfo*)resp)->cmd == OP_READ_BOOTH_TONER)
-                {
-                    ui->fixture_state_label->setText("<p style=\"color:red;font-weight:bold\">粉盒 读取失败！</p>");
-                }
-                else if (((RespInfo*)resp)->cmd == OP_READ_BOOTH_DRUM)
-                {
-                    ui->fixture_state_label->setText("<p style=\"color:red;font-weight:bold\">鼓组件 读取失败！</p>");
-                }
-            }
-            play_mp3_sound(QCoreApplication::applicationDirPath() + "/sound/failed.mp3");
-
-            this->Sleep(3000);
-        }
-
-        server_status = _INVALID_PARA;
-        break;
     }
 }
 
@@ -1257,76 +889,9 @@ void MainDialog::set_style_sheet(QString filename)
     skinfile.close();
 }
 
-void MainDialog::on_ChooseLight_clicked()
+void MainDialog::bulkdataReceived()
 {
-    theme_state = 0;
-    this->set_style_sheet("light.qss");
-}
 
-void MainDialog::on_ChooseDeep_clicked()
-{
-    theme_state = 2;
-    this->set_style_sheet("dark.qss");
-}
-
-void MainDialog::on_FourChips_clicked()
-{
-    if (chipmode == false)
-        return;
-    chipmode = false;
-
-    serial_id -= 4;
-
-    lineedit[0]->clear();
-    lineedit[1]->clear();
-    lineedit[2]->clear();
-    lineedit[3]->clear();
-
-    m_Widget->hide();
-}
-
-void MainDialog::on_EightChips_clicked()
-{
-    if (chipmode == true)
-        return;
-    chipmode = true;
-
-    m_Widget->show();
-
-    if (ui->ChooseAuto->isChecked())
-    {
-        for (qint8 i = 0; i < 4; i++)
-        {
-            readbutton[i]->hide();
-            writebutton[i]->hide();
-        }
-    }
-    else if (ui->ChooseManual->isChecked())
-    {
-        for (qint8 i = 0; i < 4; i++)
-        {
-            readbutton[i]->show();
-            writebutton[i]->show();
-        }
-    }
-
-    serial_no[4] = QString("%1%2%3%4%5%6%7").arg(serial_prefix).arg(ComponentNo).arg(serial_trade)
-            .arg(serial_year[year-2021]).arg(serial_month[month-1]).arg(serial_day[day-1]).arg(serial_id++, 4, 10, QLatin1Char('0'));
-    serial_no[5] = QString("%1%2%3%4%5%6%7").arg(serial_prefix).arg(ComponentNo).arg(serial_trade)
-            .arg(serial_year[year-2021]).arg(serial_month[month-1]).arg(serial_day[day-1]).arg(serial_id++, 4, 10, QLatin1Char('0'));
-    serial_no[6] = QString("%1%2%3%4%5%6%7").arg(serial_prefix).arg(ComponentNo).arg(serial_trade)
-            .arg(serial_year[year-2021]).arg(serial_month[month-1]).arg(serial_day[day-1]).arg(serial_id++, 4, 10, QLatin1Char('0'));
-    serial_no[7] = QString("%1%2%3%4%5%6%7").arg(serial_prefix).arg(ComponentNo).arg(serial_trade)
-            .arg(serial_year[year-2021]).arg(serial_month[month-1]).arg(serial_day[day-1]).arg(serial_id++, 4, 10, QLatin1Char('0'));
-
-    if (ui->QuantityRemain->text().toInt() >= 5)
-        lineedit[0]->setText(serial_no[4]);
-    if (ui->QuantityRemain->text().toInt() >= 6)
-        lineedit[1]->setText(serial_no[5]);
-    if (ui->QuantityRemain->text().toInt() >= 7)
-        lineedit[2]->setText(serial_no[6]);
-    if (ui->QuantityRemain->text().toInt() >= 8)
-        lineedit[3]->setText(serial_no[7]);
 }
 
 //发送读写芯片数据
@@ -1337,14 +902,16 @@ bool MainDialog::sendData(int cmd, void* data, int data_len)
     if (tcpSocket[1] == NULL)
         tcpSocket[1] = new QTcpSocket(this);
 
-    connect(tcpSocket[1], SIGNAL(connected()), this, SLOT(slotConnected()));
-    connect(tcpSocket[1], SIGNAL(readyRead()), this, SLOT(dataReceived()));
+    connect(tcpSocket[1], SIGNAL(connected()), this, SLOT(slotConnected1()));
+    connect(tcpSocket[1], SIGNAL(readyRead()), this, SLOT(bulkdataReceived()));
 
     if (tcpSocket[1]->isOpen())
         tcpSocket[1]->close();
 
+    server_status[1] = _FAILED_STATUS;
     tcpSocket[1]->connectToHost(ui->FixtureIPAddr->text(), TCP_PORT);
-    if (!tcpSocket[1]->isOpen())
+    Sleep(100);
+    if (server_status[1] == _FAILED_STATUS)
         return false;
 
     ((MsgHdr*)writeinfo)->cmd = cmd;
@@ -1359,146 +926,14 @@ bool MainDialog::sendData(int cmd, void* data, int data_len)
         memcpy(writeinfo + sizeof(MsgHdr), data, data_len);
 //        this->hex_dump((unsigned char*)&writeinfo, sizeof(writeinfo));
     }
-    else if (cmd == OP_SEND_ONE_INFO)
-    {
-        memcpy(writeinfo + sizeof(MsgHdr), data, data_len);
-
-        if (strncasecmp(((struct cgprintech_supply_info*)(writeinfo + sizeof(MsgHdr) + sizeof(uint8_t)))->model_id, "TL", 2) == 0)
-            ((MsgHdr*)writeinfo)->i2c_addr = _TONER_CHIP_ADDR;
-        else
-            ((MsgHdr*)writeinfo)->i2c_addr = _DRUM_CHIP_ADDR;
-    }
-    else
-    {
-        if (cmd == OP_READ_BOOTH_TONER)
-            ((MsgHdr*)writeinfo)->i2c_addr = _TONER_CHIP_ADDR;
-        else if (cmd == OP_READ_BOOTH_DRUM)
-            ((MsgHdr*)writeinfo)->i2c_addr = _DRUM_CHIP_ADDR;
-    }
 
     if (tcpSocket[1]->write((const char*)&writeinfo, sizeof(writeinfo)) == -1)
     {
 //        qDebug() << "write to tcp socket failed";
-        return false;
+        return _FAILED_STATUS;
     }
 
-    return true;
-}
-
-void MainDialog::send_onecmd_read(uint8_t index)
-{
-    //1.发送读取耗材信息命令
-    if (ui->ChipModelID->text().mid(0, 2).compare("TL", Qt::CaseSensitive) == 0)
-        this->sendData(OP_READ_BOOTH_TONER, NULL, index);
-    else
-        this->sendData(OP_READ_BOOTH_DRUM, NULL, index);
-}
-
-void MainDialog::on_ReadChip1_clicked()
-{
-    send_onecmd_read(0);
-}
-
-void MainDialog::on_ReadChip2_clicked()
-{
-    send_onecmd_read(1);
-}
-
-void MainDialog::on_ReadChip3_clicked()
-{
-    send_onecmd_read(2);
-}
-
-void MainDialog::on_ReadChip4_clicked()
-{
-    send_onecmd_read(3);
-}
-
-void MainDialog::ReadChip5_clicked()
-{
-    send_onecmd_read(4);
-}
-
-void MainDialog::ReadChip6_clicked()
-{
-    send_onecmd_read(5);
-}
-
-void MainDialog::ReadChip7_clicked()
-{
-    send_onecmd_read(6);
-}
-
-void MainDialog::ReadChip8_clicked()
-{
-    send_onecmd_read(7);
-}
-
-void MainDialog::send_oneinfo_write(uint8_t index, char* serialno)
-{
-    WriteBoothInfo winfo;
-    unsigned int len;
-
-    memset(&winfo, 0, sizeof(WriteBoothInfo));
-
-    winfo.index = index;
-    memcpy(&winfo.info.model_id, ui->ChipModelID->text().toLatin1().data(), ui->ChipModelID->text().length());
-    memcpy(&winfo.info.serial_no, serialno, strlen(serialno));
-    memcpy(&winfo.info.marketing_area, ui->MarketingArea->text().toLatin1().data(), ui->MarketingArea->text().length());
-    memcpy(&winfo.info.manufacturer, ui->manufacturer->currentText().toLatin1().data(), ui->manufacturer->currentText().length());
-    memcpy(&winfo.info.trade_mark, ui->TradeMark->currentText().toLatin1().data(), ui->TradeMark->currentText().length());
-    memcpy(&winfo.info.type, ui->MarketingArea->text().toLatin1().data(), ui->MarketingArea->text().length());
-
-    QString current_date = QString("%1%2%3")
-            .arg(year, 4, 10, QLatin1Char('0'))
-            .arg(month, 2, 10, QLatin1Char('0'))
-            .arg(day, 2, 10, QLatin1Char('0'));
-    StringToHex(current_date.toLatin1().data(), winfo.info.product_date, &len);
-    Pack32(winfo.info.pages, ui->TotalPages->text().toUInt());
-    Pack16(winfo.info.beyond_pages, ui->BeyondPages->text().toUInt());
-    Pack16(winfo.info.free_pages, ui->FreePages->text().toUInt());
-
-    sendData(OP_SEND_ONE_INFO, &winfo, sizeof(WriteBoothInfo));
-}
-
-void MainDialog::on_WriteChip1_clicked()
-{
-    send_oneinfo_write(0, ui->Chip1SerialNo->text().toLatin1().data());
-}
-
-void MainDialog::on_WriteChip2_clicked()
-{
-    send_oneinfo_write(1, ui->Chip2SerialNo->text().toLatin1().data());
-}
-
-void MainDialog::on_WriteChip3_clicked()
-{
-    send_oneinfo_write(2, ui->Chip3SerialNo->text().toLatin1().data());
-}
-
-void MainDialog::on_WriteChip4_clicked()
-{
-    send_oneinfo_write(3, ui->Chip4SerialNo->text().toLatin1().data());
-}
-
-void MainDialog::WriteChip5_clicked()
-{
-    send_oneinfo_write(4, lineedit[0]->text().toLatin1().data());
-}
-
-void MainDialog::WriteChip6_clicked()
-{
-    send_oneinfo_write(5, lineedit[1]->text().toLatin1().data());
-}
-
-void MainDialog::WriteChip7_clicked()
-{
-    send_oneinfo_write(6, lineedit[2]->text().toLatin1().data());
-}
-
-void MainDialog::WriteChip8_clicked()
-{
-    send_oneinfo_write(7, lineedit[3]->text().toLatin1().data());
+    return _SUCCESS_STATUS;
 }
 
 void MainDialog::insert_info_mysql(char* serialno)

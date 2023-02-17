@@ -3,6 +3,5 @@
     <file>images/logo.png</file>
     <file>qss/light.qss</file>
     <file>qss/dark.qss</file>
-    <file>5_8booth.ui</file>
   </qresource>
 </RCC>

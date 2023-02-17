@@ -3,11 +3,6 @@
 
 #include <QString>
 
-// 服务端监听的端口号
-#define TCP_PORT   8899
-//监听的广播端口
-#define BC_UDP_PORT   8890
-
 #define _TONER_CHIP_ADDR    0x2c
 #define _DRUM_CHIP_ADDR     0x28
 
@@ -23,20 +18,15 @@ enum {
     OP_GET_STATUS,          //获取治具状态，返回治具上安装的耗材芯片状态
     OP_GET_SUPPLY_INFO,     //获取耗材信息
 
-    OP_GET_BOOTH_STATE,     //获取治具各卡座状态
     OP_GET_STATE_LONGCONN,  //获取状态的长连接
     OP_WRITE_BULK_INFO,     //批量写入耗材信息
-    OP_READ_BOOTH_TONER,
-    OP_READ_BOOTH_DRUM,
-
     OP_SEND_BULK_INFO,      //发送批量数据到治具
-    OP_SEND_ONE_INFO,       //发送某个卡座数据到治具，单独写入
-    OP_STOP_GET_BOOTH_STATE,    //上位机停止检测卡座状态，按钮按下时
-    OP_RESUME_GET_BOOTH_STATE,  //上位机重新开始检测卡座状态，按钮松开时
+    OP_TRIGGER_OUT,         //抬起动作
     RE_HEARTBEAT_SIGNAL,    //发送心跳包，维护长连接句柄有效性
 
     OP_BROADCAST_UDP_REQUEST = 99,
     OP_BROADCAST_UDP_RESP,
+    OP_HB_UDP_REQUEST,       //UDP的心跳包
 };
 
 //下位机的反馈
@@ -153,12 +143,8 @@ typedef struct booth_state {
 #define _CHIP_WRITE_FAILED   1    //写入失败
 #define _CHIP_HAS_DATA       2    //芯片已有数据，未写
 #define _CHIP_MISSING        3    //未发现芯片
-    uint8_t state[8];   //根据mode决定可用数据
-    //卡座状态定义
-#define _NO_CHIP       0        //未放置芯片
-#define _BLANK_CHIP    1        //放置了空白芯片
-#define _USED_CHIP     2        //放置了已有数据芯片
-#define _OFF_LINE      3        //设备离线
+    uint8_t state[4];   //根据mode决定可用数据
+    char serial_no[4][32];          //4组序列号
 } __attribute__((__packed__)) BoothState;
 
 //写单个卡座信息
@@ -179,7 +165,7 @@ typedef struct read_booth_chip {
 //该批次数据，批量发送到治具
 typedef struct booth_supply_info_w {
     int booth_num;        //本次使用的1拖4，该值为4，本次使用1拖8，该值为8
-    char serial_no[8][32];          //8组序列号
+    char serial_no[4][32];          //8组序列号
     char model_id[16];              //型号
     char marketing_area[4];         //销售地区
     uint8_t product_date[4];        //出厂日期
