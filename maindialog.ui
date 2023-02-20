@@ -1310,7 +1310,7 @@
                   </font>
                  </property>
                  <property name="toolTip">
-                  <string>在此键入 IP 地址或双击局域网的候选 IP 地址</string>
+                  <string>在此键入 IP 地址或双击上方框中局域网候选治具 IP 地址</string>
                  </property>
                  <property name="maxLength">
                   <number>40</number>

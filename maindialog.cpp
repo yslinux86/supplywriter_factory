@@ -301,7 +301,6 @@ void MainDialog::update_connect_fixture()
 
             //测试发现治具连接正常，发送批量芯片数据到治具
             sendData(OP_SEND_BULK_INFO, &info, sizeof(BoothSupplyInfoW));
-//            need_send_info = false;
         }
     }
     else
@@ -322,7 +321,7 @@ void MainDialog::Update_FixtureStatus()
     else if (server_status[0] == _SUCCESS_STATUS)
     {
 //        qDebug() << "server is ONLINE";
-        ui->fixture_state_label->setText(tr("<font style='color:#00CD00; font:bold;'>%1</font>").arg(QStringLiteral("治具在线")));
+        ui->fixture_state_label->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("治具在线")));
     }
 }
 
@@ -541,13 +540,13 @@ void MainDialog::slotGetDBStatus(quint8 _odbc_status)
 
     if (odbc_status == _FAILED_STATUS)
     {
-        ui->db_state_label->setText(tr("<font style='color:red; font:bold;'>%1</font>").arg(QStringLiteral("连接失败！")));
+        ui->db_state_label->setText(tr("<font style='color:red; font:bold;'>%1</font>").arg(QStringLiteral("连接失败")));
         ui->QueryInfo->setEnabled(false);
         ui->DeleteInfo->setEnabled(false);
     }
     else if (odbc_status == _SUCCESS_STATUS)
     {
-        ui->db_state_label->setText(tr("<font style='color:green; font:bold;'>%1</font>").arg(QStringLiteral("连接成功！")));
+        ui->db_state_label->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("连接成功")));
         if (ui->TheSerialNo->text().length())
         {
             ui->QueryInfo->setEnabled(true);
@@ -556,7 +555,7 @@ void MainDialog::slotGetDBStatus(quint8 _odbc_status)
     }
     else if (odbc_status == _INVALID_PARA)
     {
-        ui->db_state_label->setText(tr("<font style='color:red; font:bold;'>%1</font>").arg(QStringLiteral("信息不正确！")));
+        ui->db_state_label->setText(tr("<font style='color:red; font:bold;'>%1</font>").arg(QStringLiteral("信息不正确")));
         ui->QueryInfo->setEnabled(false);
         ui->DeleteInfo->setEnabled(false);
     }
@@ -596,7 +595,7 @@ void MainDialog::result_Received()
             //收到治具发来的回应，正常，记下时间戳
 //            qDebug() << "recv response from fixture";
         }
-        else if (state.resp.cmd == OP_TRIGGER_OUT)
+        else if (state.resp.cmd == FIXTURE_TRIGGER_UP)
         {
 //            qDebug() << "trigger out from fixture";
             ui->booth1state->clear();
@@ -616,7 +615,7 @@ void MainDialog::result_Received()
             if (state.state[0] == _CHIP_WRITE_SUCCESS)
             {
                 ui->booth1state->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
-                ui->serialno1->setText(tr("<font style='color:#003153;'>%1</font>").arg(state.serial_no[0]));
+                ui->serialno1->setText(tr("<font style='color:#003153;'>SN：%1</font>").arg(state.serial_no[0]));
                 //将耗材信息存入数据库
                 insert_info_mysql(ui->Chip1SerialNo->text().toLocal8Bit().data());
             }
@@ -630,7 +629,7 @@ void MainDialog::result_Received()
             if (state.state[1] == _CHIP_WRITE_SUCCESS)
             {
                 ui->booth2state->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
-                ui->serialno2->setText(tr("<font style='color:#003153;'>%1</font>").arg(state.serial_no[1]));
+                ui->serialno2->setText(tr("<font style='color:#003153;'>SN：%1</font>").arg(state.serial_no[1]));
                 insert_info_mysql(ui->Chip2SerialNo->text().toLocal8Bit().data());
             }
             else if (state.state[1] == _CHIP_WRITE_FAILED)
@@ -643,7 +642,7 @@ void MainDialog::result_Received()
             if (state.state[2] == _CHIP_WRITE_SUCCESS)
             {
                 ui->booth3state->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
-                ui->serialno3->setText(tr("<font style='color:#003153;'>%1</font>").arg(state.serial_no[2]));
+                ui->serialno3->setText(tr("<font style='color:#003153;'>SN：%1</font>").arg(state.serial_no[2]));
                 insert_info_mysql(ui->Chip3SerialNo->text().toLocal8Bit().data());
             }
             else if (state.state[2] == _CHIP_WRITE_FAILED)
@@ -656,7 +655,7 @@ void MainDialog::result_Received()
             if (state.state[3] == _CHIP_WRITE_SUCCESS)
             {
                 ui->booth4state->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
-                ui->serialno4->setText(tr("<font style='color:#003153;'>%1</font>").arg(state.serial_no[3]));
+                ui->serialno4->setText(tr("<font style='color:#003153;'>SN：%1</font>").arg(state.serial_no[3]));
                 insert_info_mysql(ui->Chip4SerialNo->text().toLocal8Bit().data());
             }
             else if (state.state[3] == _CHIP_WRITE_FAILED)
