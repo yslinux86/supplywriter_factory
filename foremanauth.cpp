@@ -12,7 +12,6 @@ ForeManAuth::ForeManAuth(QWidget *parent) :
     ui(new Ui::ForeManAuth)
 {
     ui->setupUi(this);
-
     setWindowFlags(Qt::WindowMinimizeButtonHint |
                    Qt::WindowCloseButtonHint);
 
@@ -123,11 +122,16 @@ void ForeManAuth::on_OKButton_clicked()
         ui->ForemanAuthState->setText("<p style=\"color:red;font-weight:bold\">计划生产总数或初始序号为空！</p>");
         return;
     }
-//    if (ui->PlannedNumber->text().toUInt() < 16)
-//    {
-//        ui->ForemanAuthState->setText("<p style=\"color:red;font-weight:bold\">计划生产总数应不小于16！</p>");
-//        return;
-//    }
+    if (ui->PlannedNumber->text().toUInt() == 0)
+    {
+        ui->ForemanAuthState->setText("<p style=\"color:red;font-weight:bold\">计划生产总数应大于 0！</p>");
+        return;
+    }
+    if (ui->PlannedNumber->text().toUInt() + ui->FirstNumber->text().toUInt() > 10000)
+    {
+        ui->ForemanAuthState->setText("<p style=\"color:red;font-weight:bold\">计划生产芯片序列号可能越界！</p>");
+        return;
+    }
 
     MainDialog *main = new MainDialog();
     connect(this, SIGNAL(send_work_content(QString, QString, QString, quint32, quint32)),

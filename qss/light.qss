@@ -66,3 +66,9 @@ QSpinBox {
     border: 1px solid #6495ED;
     border-radius: 4px;
 }
+QComboBox {
+    border: 1px solid #6495ED;
+    border-radius: 4px;
+    padding: 1px 8px 1px 4px;
+    min-width: 6em;
+}

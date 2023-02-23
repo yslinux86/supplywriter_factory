@@ -6,14 +6,20 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>430</width>
-    <height>450</height>
+    <width>420</width>
+    <height>440</height>
    </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>420</width>
+    <height>440</height>
+   </size>
   </property>
   <property name="maximumSize">
    <size>
-    <width>480</width>
-    <height>480</height>
+    <width>420</width>
+    <height>440</height>
    </size>
   </property>
   <property name="font">
@@ -28,201 +34,227 @@
   <property name="modal">
    <bool>true</bool>
   </property>
-  <layout class="QFormLayout" name="formLayout">
-   <item row="0" column="0" colspan="2">
-    <layout class="QVBoxLayout" name="verticalLayout">
-     <property name="spacing">
-      <number>8</number>
+  <layout class="QGridLayout" name="gridLayout">
+   <property name="leftMargin">
+    <number>12</number>
+   </property>
+   <property name="topMargin">
+    <number>10</number>
+   </property>
+   <property name="rightMargin">
+    <number>12</number>
+   </property>
+   <property name="bottomMargin">
+    <number>10</number>
+   </property>
+   <item row="0" column="0">
+    <layout class="QVBoxLayout" name="verticalLayout_2">
+     <property name="bottomMargin">
+      <number>0</number>
      </property>
-     <property name="leftMargin">
-      <number>50</number>
-     </property>
-     <property name="topMargin">
-      <number>20</number>
-     </property>
-     <property name="rightMargin">
-      <number>50</number>
-     </property>
      <item>
-      <widget class="QLabel" name="logo">
-       <property name="text">
-        <string/>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="title">
-       <property name="text">
-        <string>辰光融信 耗材信息写入工具</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <spacer name="verticalSpacer">
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>20</width>
-         <height>40</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QLabel" name="formanauth">
-       <property name="text">
-        <string>领班授权</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="ForemanName">
-       <property name="font">
-        <font>
-         <family>微软雅黑</family>
-         <pointsize>10</pointsize>
-        </font>
-       </property>
-       <property name="maxLength">
-        <number>16</number>
-       </property>
-       <property name="placeholderText">
-        <string>请输入领班用户名</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="ForemanPasswd">
-       <property name="font">
-        <font>
-         <family>微软雅黑</family>
-         <pointsize>10</pointsize>
-        </font>
-       </property>
-       <property name="maxLength">
-        <number>16</number>
-       </property>
-       <property name="placeholderText">
-        <string>请输入领班密码</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QComboBox" name="ComponentNo">
-       <property name="font">
-        <font>
-         <family>微软雅黑</family>
-         <pointsize>10</pointsize>
-        </font>
-       </property>
-       <property name="toolTip">
-        <string>选择组件料号</string>
-       </property>
-       <property name="statusTip">
-        <string/>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="PlannedNumber">
-       <property name="maxLength">
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <property name="spacing">
         <number>8</number>
        </property>
-       <property name="placeholderText">
-        <string>请输入计划生产总数</string>
+       <property name="leftMargin">
+        <number>70</number>
        </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="FirstNumber">
-       <property name="font">
-        <font>
-         <family>微软雅黑</family>
-         <pointsize>10</pointsize>
-        </font>
+       <property name="topMargin">
+        <number>20</number>
        </property>
-       <property name="maxLength">
-        <number>8</number>
+       <property name="rightMargin">
+        <number>70</number>
        </property>
-       <property name="placeholderText">
-        <string>请输入工单初始序号</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
-        <spacer name="horizontalSpacer">
+        <widget class="QLabel" name="logo">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="title">
+         <property name="text">
+          <string>辰光融信 耗材信息写入工具</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer">
          <property name="orientation">
-          <enum>Qt::Horizontal</enum>
+          <enum>Qt::Vertical</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>40</width>
-           <height>20</height>
+           <width>20</width>
+           <height>40</height>
           </size>
          </property>
         </spacer>
        </item>
        <item>
-        <widget class="QPushButton" name="OKButton">
+        <widget class="QLabel" name="formanauth">
          <property name="text">
-          <string>确定</string>
+          <string>领班授权</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="CancelButton">
-         <property name="text">
-          <string>取消</string>
+        <widget class="QLineEdit" name="ForemanName">
+         <property name="font">
+          <font>
+           <family>微软雅黑</family>
+           <pointsize>10</pointsize>
+          </font>
+         </property>
+         <property name="maxLength">
+          <number>16</number>
+         </property>
+         <property name="placeholderText">
+          <string>请输入领班用户名</string>
          </property>
         </widget>
        </item>
        <item>
-        <spacer name="horizontalSpacer_2">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
+        <widget class="QLineEdit" name="ForemanPasswd">
+         <property name="font">
+          <font>
+           <family>微软雅黑</family>
+           <pointsize>10</pointsize>
+          </font>
          </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>40</width>
-           <height>20</height>
-          </size>
+         <property name="maxLength">
+          <number>16</number>
          </property>
-        </spacer>
+         <property name="placeholderText">
+          <string>请输入领班密码</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="ComponentNo">
+         <property name="font">
+          <font>
+           <family>微软雅黑</family>
+           <pointsize>10</pointsize>
+          </font>
+         </property>
+         <property name="toolTip">
+          <string>选择组件料号</string>
+         </property>
+         <property name="statusTip">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="PlannedNumber">
+         <property name="maxLength">
+          <number>4</number>
+         </property>
+         <property name="placeholderText">
+          <string>请输入计划生产总数</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="FirstNumber">
+         <property name="font">
+          <font>
+           <family>微软雅黑</family>
+           <pointsize>10</pointsize>
+          </font>
+         </property>
+         <property name="maxLength">
+          <number>4</number>
+         </property>
+         <property name="placeholderText">
+          <string>请输入工单初始序号</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout">
+         <item>
+          <spacer name="horizontalSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="OKButton">
+           <property name="text">
+            <string>确定</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="CancelButton">
+           <property name="text">
+            <string>取消</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_2">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="ForemanAuthState">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
        </item>
       </layout>
      </item>
      <item>
-      <widget class="QLabel" name="ForemanAuthState">
-       <property name="text">
-        <string/>
+      <layout class="QHBoxLayout" name="horizontalLayout_2">
+       <property name="bottomMargin">
+        <number>0</number>
        </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="label_2">
-       <property name="text">
-        <string>Cgprintech 辰光融信 版权所有 2023 V3.0</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
+       <item>
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>Cgprintech 辰光融信 版权所有 2023 V3.0</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </item>
     </layout>
    </item>

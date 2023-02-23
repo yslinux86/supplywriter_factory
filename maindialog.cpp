@@ -39,6 +39,8 @@ MainDialog::MainDialog(QWidget *parent)
     if (!worker->isRunning())
         worker->start(QThread::NormalPriority);
 
+    scan_the_fixtures();
+
     timer[0] = new QTimer(this);
     timer[1] = new QTimer(this);
     timer[2] = new QTimer(this);
@@ -586,7 +588,7 @@ void MainDialog::result_Received()
         QByteArray datagram;
         length = tcpSocket[2]->bytesAvailable();
 
-        datagram.resize(tcpSocket[2]->bytesAvailable());
+        datagram.resize(length);
         tcpSocket[2]->read(datagram.data(), datagram.size());
         memcpy(&state, datagram.data(), length);
 
@@ -612,7 +614,7 @@ void MainDialog::result_Received()
         {
 //            qDebug() << "write bulk chip data result recved";
             //收到治具批量写数据结果信息
-            if (state.state[0] == _CHIP_WRITE_SUCCESS)
+            if (state.state[0] == _CHIP_WRITE_SUCCESS && strlen(state.serial_no[0]) > 8)
             {
                 ui->booth1state->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
                 ui->serialno1->setText(tr("<font style='color:#003153;'>SN：%1</font>").arg(state.serial_no[0]));
@@ -622,11 +624,11 @@ void MainDialog::result_Received()
             else if (state.state[0] == _CHIP_WRITE_FAILED)
                 ui->booth1state->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("写入失败")));
             else if (state.state[0] == _CHIP_HAS_DATA)
-                ui->booth1state->setText(tr("<font style='color:#00341C; font:bold;'>%1</font>").arg(QStringLiteral("芯片已有数据")));
+                ui->booth1state->setText(tr("<font style='color:#FF6347; font:bold;'>%1</font>").arg(QStringLiteral("芯片已有数据")));
             else if (state.state[0] == _CHIP_MISSING)
-                ui->booth1state->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("未发现芯片")));
+                ui->booth1state->setText(tr("<font style='color:#FA8072; font:bold;'>%1</font>").arg(QStringLiteral("未发现芯片")));
 
-            if (state.state[1] == _CHIP_WRITE_SUCCESS)
+            if (state.state[1] == _CHIP_WRITE_SUCCESS && strlen(state.serial_no[1]) > 8)
             {
                 ui->booth2state->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
                 ui->serialno2->setText(tr("<font style='color:#003153;'>SN：%1</font>").arg(state.serial_no[1]));
@@ -635,11 +637,11 @@ void MainDialog::result_Received()
             else if (state.state[1] == _CHIP_WRITE_FAILED)
                 ui->booth2state->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("写入失败")));
             else if (state.state[1] == _CHIP_HAS_DATA)
-                ui->booth2state->setText(tr("<font style='color:#00341C; font:bold;'>%1</font>").arg(QStringLiteral("芯片已有数据")));
+                ui->booth2state->setText(tr("<font style='color:#FF6347; font:bold;'>%1</font>").arg(QStringLiteral("芯片已有数据")));
             else if (state.state[1] == _CHIP_MISSING)
-                ui->booth2state->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("未发现芯片")));
+                ui->booth2state->setText(tr("<font style='color:#FA8072; font:bold;'>%1</font>").arg(QStringLiteral("未发现芯片")));
 
-            if (state.state[2] == _CHIP_WRITE_SUCCESS)
+            if (state.state[2] == _CHIP_WRITE_SUCCESS && strlen(state.serial_no[2]) > 8)
             {
                 ui->booth3state->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
                 ui->serialno3->setText(tr("<font style='color:#003153;'>SN：%1</font>").arg(state.serial_no[2]));
@@ -648,11 +650,11 @@ void MainDialog::result_Received()
             else if (state.state[2] == _CHIP_WRITE_FAILED)
                 ui->booth3state->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("写入失败")));
             else if (state.state[2] == _CHIP_HAS_DATA)
-                ui->booth3state->setText(tr("<font style='color:#00341C; font:bold;'>%1</font>").arg(QStringLiteral("芯片已有数据")));
+                ui->booth3state->setText(tr("<font style='color:#FF6347; font:bold;'>%1</font>").arg(QStringLiteral("芯片已有数据")));
             else if (state.state[2] == _CHIP_MISSING)
-                ui->booth3state->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("未发现芯片")));
+                ui->booth3state->setText(tr("<font style='color:#FA8072; font:bold;'>%1</font>").arg(QStringLiteral("未发现芯片")));
 
-            if (state.state[3] == _CHIP_WRITE_SUCCESS)
+            if (state.state[3] == _CHIP_WRITE_SUCCESS && strlen(state.serial_no[3]) > 8)
             {
                 ui->booth4state->setText(tr("<font style='color:#01847e; font:bold;'>%1</font>").arg(QStringLiteral("写入成功")));
                 ui->serialno4->setText(tr("<font style='color:#003153;'>SN：%1</font>").arg(state.serial_no[3]));
@@ -661,9 +663,9 @@ void MainDialog::result_Received()
             else if (state.state[3] == _CHIP_WRITE_FAILED)
                 ui->booth4state->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("写入失败")));
             else if (state.state[3] == _CHIP_HAS_DATA)
-                ui->booth4state->setText(tr("<font style='color:#00341C; font:bold;'>%1</font>").arg(QStringLiteral("芯片已有数据")));
+                ui->booth4state->setText(tr("<font style='color:#FF6347; font:bold;'>%1</font>").arg(QStringLiteral("芯片已有数据")));
             else if (state.state[3] == _CHIP_MISSING)
-                ui->booth4state->setText(tr("<font style='color:#DC143C; font:bold;'>%1</font>").arg(QStringLiteral("未发现芯片")));
+                ui->booth4state->setText(tr("<font style='color:#FA8072; font:bold;'>%1</font>").arg(QStringLiteral("未发现芯片")));
 
             int remain_num = ui->QuantityRemain->text().toInt();
             current_number = serial_id;
@@ -687,10 +689,10 @@ void MainDialog::result_Received()
                 ui->CurrentNumber->setNum(current_number);
             }
 
-            if (remain_num > 4)
+            if (remain_num - 4 > 4)
                 update_serialno(4);
             else
-                update_serialno(remain_num);
+                update_serialno(remain_num - 4);
         }
     }
 }
@@ -735,9 +737,8 @@ bool MainDialog::check_server_status()
 
     server_status[0] = _FAILED_STATUS;
     tcpSocket[0]->connectToHost(ui->FixtureIPAddr->text(), TCP_PORT);
+
     Sleep(100);
-
-
     return server_status[0];
 }
 

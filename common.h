@@ -138,12 +138,13 @@ struct cgprintech_supply_info_readback
 typedef struct booth_state {
     RespInfo resp;
     uint8_t mode;     //根据上位机对卡座组的选择决定
+
     //写芯片结果定义
 #define _CHIP_WRITE_SUCCESS  0    //写入成功
 #define _CHIP_WRITE_FAILED   1    //写入失败
 #define _CHIP_HAS_DATA       2    //芯片已有数据，未写
 #define _CHIP_MISSING        3    //未发现芯片
-    uint8_t state[4];   //根据mode决定可用数据
+    uint8_t state[4];             //根据mode决定可用数据
     char serial_no[4][32];          //4组序列号
 } __attribute__((__packed__)) BoothState;
 

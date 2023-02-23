@@ -17,13 +17,7 @@
 #include <QListWidgetItem>
 #include <QSystemTrayIcon>
 #include <QMediaPlayer>
-#include <QButtonGroup>
 #include <QTimer>
-#include <QCheckBox>
-#include <QRadioButton>
-#include <QPushButton>
-#include <QLineEdit>
-#include <QLabel>
 
 #include "statemonitor.h"
 
