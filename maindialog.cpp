@@ -597,7 +597,7 @@ void MainDialog::result_Received()
             //收到治具发来的回应，正常，记下时间戳
 //            qDebug() << "recv response from fixture";
         }
-        else if (state.resp.cmd == FIXTURE_TRIGGER_UP)
+        else if (state.resp.cmd == OP_TRIGGER_OUT)
         {
 //            qDebug() << "trigger out from fixture";
             ui->booth1state->clear();
@@ -1171,8 +1171,8 @@ void MainDialog::on_TheSerialNo_textChanged(const QString &arg1)
     }
     else
     {
-        ui->QueryInfo->setEnabled(true);
-        ui->DeleteInfo->setEnabled(true);
+        ui->QueryInfo->setEnabled(false);
+        ui->DeleteInfo->setEnabled(false);
     }
 }
 

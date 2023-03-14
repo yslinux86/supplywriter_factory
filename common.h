@@ -21,11 +21,12 @@ enum {
     OP_GET_STATE_LONGCONN,  //获取状态的长连接
     OP_WRITE_BULK_INFO,     //批量写入耗材信息
     OP_SEND_BULK_INFO,      //发送批量数据到治具
-    FIXTURE_TRIGGER_UP,         //抬起动作
+    OP_TRIGGER_OUT,         //抬起动作
     RE_HEARTBEAT_SIGNAL,    //发送心跳包，维护长连接句柄有效性
 
-    OP_BROADCAST_UDP_REQUEST = 99,
-    OP_BROADCAST_UDP_RESP,
+    OP_BROADCAST_UDP_REQUEST = 99,  //来自上位机的广播嗅探报文，治具收到该报文回复本机IP地址
+                                    //以使上位机自动得知内网中的治具设备，由用户选择，而不是输入
+    OP_BROADCAST_UDP_RESP,   //治具以该命令回复
     OP_HB_UDP_REQUEST,       //UDP的心跳包
 };
 
@@ -178,10 +179,13 @@ typedef struct booth_supply_info_w {
     uint8_t free_pages[2];          //前N页打印不计数消耗页数
 } __attribute__((__packed__)) BoothSupplyInfoW;
 
+
+#define INET_ADDRSTRLEN   16
+
 //治具回复的广播报文
 typedef struct bc_info_resp {
     RespInfo resp;
-    char ipaddr[40];
+    char ipaddr[INET_ADDRSTRLEN];
 } __attribute__((__packed__)) BcInfoResp;
 
 #endif
